@@ -317,23 +317,38 @@ fn render_timeline_view(frame: &mut Frame, state: &AppState, area: Rect) {
                 Span::styled("  ── Replies ──────────────────────", colors.text_dim()),
             ]));
             
-            for reply in state.current_replies.iter().take(5) {
+            for reply in state.current_replies.iter().take(10) {
                 detail_content.push(Line::from(""));
                 detail_content.push(Line::from(vec![
                     Span::styled("  ", Style::default()),
                     Span::styled(format!("@{}", reply.author_handle), colors.text_primary()),
                     Span::styled(format!(" · {}", reply.relative_time()), colors.text_muted()),
                 ]));
+                // Show full content
+                if reply.content.contains('\n') {
+                    // Multi-line content
+                    for line in reply.content.lines() {
+                        detail_content.push(Line::from(vec![
+                            Span::styled("    ", Style::default()),
+                            Span::styled(line.to_string(), colors.text()),
+                        ]));
+                    }
+                } else {
+                    // Single line content
+                    detail_content.push(Line::from(vec![
+                        Span::styled("    ", Style::default()),
+                        Span::styled(&reply.content, colors.text()),
+                    ]));
+                }
                 detail_content.push(Line::from(vec![
-                    Span::styled("    ", Style::default()),
-                    Span::styled(reply.preview(50), colors.text()),
+                    Span::styled(format!("    ♡ {}  ↻ {}  💬 {}", reply.like_count, reply.repost_count, reply.reply_count), colors.text_dim()),
                 ]));
             }
             
-            if state.current_replies.len() > 5 {
+            if state.current_replies.len() > 10 {
                 detail_content.push(Line::from(""));
                 detail_content.push(Line::from(vec![
-                    Span::styled(format!("  ... and {} more replies", state.current_replies.len() - 5), colors.text_dim()),
+                    Span::styled(format!("  ... and {} more replies", state.current_replies.len() - 10), colors.text_dim()),
                 ]));
             }
         } else if state.loading_replies {
