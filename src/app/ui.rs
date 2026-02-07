@@ -718,8 +718,13 @@ fn render_compose_popup(frame: &mut Frame, state: &AppState) {
     let colors = state.theme.colors();
     let area = frame.area();
 
-    let popup_area = centered_rect(60, 50, area);
+    // Smaller dialog: 50% width, 40% height
+    let popup_area = centered_rect(50, 40, area);
+    
+    // Clear and add background
+    let bg_block = Block::default().style(Style::default().bg(colors.bg));
     frame.render_widget(Clear, popup_area);
+    frame.render_widget(bg_block, popup_area);
 
     let networks_str: String = state
         .compose_networks
@@ -729,6 +734,7 @@ fn render_compose_popup(frame: &mut Frame, state: &AppState) {
         .join(" ");
 
     let char_count = state.compose_text.len();
+    let max_chars = 500; // Mastodon default, Bluesky is 300
     
     let content = vec![
         Line::from(""),
@@ -748,27 +754,22 @@ fn render_compose_popup(frame: &mut Frame, state: &AppState) {
             ),
         ]),
         Line::from(""),
-        Line::from("  ─────────────────────────────────────────"),
-        Line::from(""),
         Line::from(vec![
-            Span::styled(format!("  {} characters", char_count), colors.text_dim()),
-        ]),
-        Line::from(""),
-        Line::from(vec![
-            Span::styled("  ", Style::default()),
-            Span::styled("Ctrl+Enter", colors.key_hint()),
-            Span::styled(" post  ", colors.text_muted()),
+            Span::styled(format!("  {}/{} ", char_count, max_chars), 
+                if char_count > max_chars { colors.text_error() } else { colors.text_dim() }),
+            Span::styled("│ ", colors.text_dim()),
+            Span::styled("Ctrl+↵", colors.key_hint()),
+            Span::styled(" post ", colors.text_muted()),
             Span::styled("Esc", colors.key_hint()),
             Span::styled(" cancel", colors.text_muted()),
         ]),
-        Line::from(vec![
-            Span::styled("  ", Style::default()),
-            Span::styled("Alt+1", colors.key_hint()),
-            Span::styled(" 🐘 Mastodon  ", colors.text_muted()),
-            Span::styled("Alt+2", colors.key_hint()),
-            Span::styled(" 🦋 Bluesky", colors.text_muted()),
-        ]),
     ];
+
+    let title = if state.compose_networks.is_empty() {
+        " 📝 Compose (Alt+1 🐘 Alt+2 🦋) ".to_string()
+    } else {
+        format!(" 📝 Compose → {} ", networks_str)
+    };
 
     let compose = Paragraph::new(content)
         .block(
@@ -777,12 +778,19 @@ fn render_compose_popup(frame: &mut Frame, state: &AppState) {
                 .border_type(BorderType::Rounded)
                 .border_style(colors.block_focus())
                 .style(Style::default().bg(colors.bg))
-                .title(format!(" 📝 Compose → {} ", networks_str))
+                .title(title)
                 .title_style(colors.text_primary()),
         )
         .wrap(Wrap { trim: false });
 
     frame.render_widget(compose, popup_area);
+    
+    // Show cursor position
+    let cursor_x = popup_area.x + 3 + state.compose_text.lines().last().map(|l| l.len()).unwrap_or(0) as u16;
+    let cursor_y = popup_area.y + 2 + state.compose_text.lines().count().saturating_sub(1) as u16;
+    if cursor_x < popup_area.x + popup_area.width - 1 && cursor_y < popup_area.y + popup_area.height - 2 {
+        frame.set_cursor_position((cursor_x, cursor_y));
+    }
 }
 
 fn render_search_popup(frame: &mut Frame, state: &AppState) {

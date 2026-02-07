@@ -278,6 +278,13 @@ impl AppState {
     pub fn open_compose(&mut self) {
         self.mode = Mode::Compose;
         self.compose_text.clear();
+        // Pre-select networks based on configured accounts
+        self.compose_networks = self.accounts
+            .iter()
+            .map(|a| a.network)
+            .collect::<std::collections::HashSet<_>>()
+            .into_iter()
+            .collect();
     }
 
     /// Close compose view
