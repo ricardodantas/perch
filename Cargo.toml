@@ -1,0 +1,85 @@
+[package]
+name = "perch"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.93"
+authors = ["Ricardo Dantas"]
+description = "A beautiful terminal social client for Mastodon and Bluesky 🐦"
+license = "MIT"
+repository = "https://github.com/ricardodantas/perch"
+homepage = "https://github.com/ricardodantas/perch"
+keywords = ["mastodon", "bluesky", "tui", "terminal", "social"]
+categories = ["command-line-utilities"]
+readme = "README.md"
+
+[dependencies]
+# Async runtime
+tokio = { version = "1.49", features = ["full"] }
+
+# TUI
+ratatui = "0.30"
+ratatui-themes = "0.1.8"
+crossterm = "0.29"
+
+# HTTP client
+reqwest = { version = "0.13", default-features = false, features = ["rustls", "json", "form"] }
+
+# Serialization
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.149"
+
+# Error handling
+thiserror = "2.0.18"
+anyhow = "1.0.101"
+
+# Database
+rusqlite = { version = "0.38", features = ["bundled"] }
+
+# Utilities
+chrono = { version = "0.4.43", features = ["serde"] }
+dirs = "6.0"
+open = "5.3.3"
+unicode-width = "0.2.2"
+textwrap = "0.16.2"
+html-escape = "0.2.13"
+uuid = { version = "1.20", features = ["v4", "serde"] }
+
+# Secure credential storage
+keyring = "3.6"
+
+# Logging
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
+
+# URL encoding
+urlencoding = "2.1.3"
+
+# Base64 for Bluesky
+base64 = "0.22.1"
+
+# HTML stripping for Mastodon
+regex-lite = "0.1.9"
+
+# TOML for config
+toml = "0.9"
+
+[dev-dependencies]
+tokio-test = "0.4"
+tempfile = "3.24"
+
+[profile.release]
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+
+[profile.dev]
+opt-level = 0
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+all = "warn"
+pedantic = "warn"
+nursery = "warn"

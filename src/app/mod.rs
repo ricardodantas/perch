@@ -1,0 +1,215 @@
+//! TUI Application module
+
+mod async_ops;
+mod events;
+mod state;
+mod ui;
+
+pub use state::AppState;
+pub use state::FocusedPanel;
+
+use anyhow::Result;
+use crossterm::{
+    event::{self, Event},
+    execute,
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
+};
+use ratatui::prelude::*;
+use std::io::stdout;
+use std::time::Duration;
+use tokio::runtime::Runtime;
+
+use crate::config::Config;
+use crate::db::Database;
+use crate::demo;
+
+use async_ops::{AsyncCommand, AsyncHandle, AsyncResult, spawn_worker};
+
+/// Run the TUI application
+pub fn run() -> Result<()> {
+    // Create tokio runtime
+    let rt = Runtime::new()?;
+
+    // Load config
+    let config = Config::load()?;
+
+    // Open database
+    let db = Database::open()?;
+
+    // Spawn async worker
+    let async_handle = rt.block_on(async { spawn_worker() });
+
+    // Initialize terminal
+    enable_raw_mode()?;
+    let mut stdout = stdout();
+    execute!(stdout, EnterAlternateScreen)?;
+    let backend = CrosstermBackend::new(stdout);
+    let mut terminal = Terminal::new(backend)?;
+    terminal.clear()?;
+
+    // Create app state
+    let mut state = AppState::new(config.clone(), db)?;
+
+    // Trigger initial refresh if we have accounts
+    if !state.accounts.is_empty() {
+        let _ = async_handle.cmd_tx.blocking_send(AsyncCommand::RefreshTimeline {
+            accounts: state.accounts.clone(),
+        });
+        state.loading = true;
+        state.set_status("Loading timeline...");
+    }
+
+    // Main loop
+    let result = run_app(&mut terminal, &mut state, async_handle, &rt);
+
+    // Restore terminal
+    disable_raw_mode()?;
+    execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
+    terminal.show_cursor()?;
+
+    result
+}
+
+fn run_app(
+    terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
+    state: &mut AppState,
+    mut async_handle: AsyncHandle,
+    _rt: &Runtime,
+) -> Result<()> {
+    loop {
+        // Process any async results
+        while let Ok(result) = async_handle.result_rx.try_recv() {
+            handle_async_result(state, result);
+        }
+
+        // Draw UI
+        terminal.draw(|frame| ui::render(frame, state))?;
+
+        // Handle events
+        if event::poll(Duration::from_millis(50))? {
+            if let Event::Key(key) = event::read()? {
+                if let Some(cmd) = events::handle_key(state, key) {
+                    let _ = async_handle.cmd_tx.blocking_send(cmd);
+                }
+            }
+        }
+
+        // Tick for animations
+        state.tick();
+
+        if state.should_quit {
+            // Shutdown async worker
+            let _ = async_handle.cmd_tx.blocking_send(AsyncCommand::Shutdown);
+            break;
+        }
+    }
+
+    // Save config on exit
+    state.config.save()?;
+
+    Ok(())
+}
+
+fn handle_async_result(state: &mut AppState, result: AsyncResult) {
+    match result {
+        AsyncResult::TimelineRefreshed { posts } => {
+            // Cache posts to database
+            for post in &posts {
+                let _ = state.db.cache_post(post);
+            }
+            state.posts = posts;
+            state.selected_post = 0;
+            state.loading = false;
+            state.set_status(format!("Loaded {} posts", state.posts.len()));
+        }
+        AsyncResult::Liked { post_id } => {
+            // Update the post in our local state
+            if let Some(post) = state.posts.iter_mut().find(|p| p.network_id == post_id) {
+                post.liked = true;
+                post.like_count += 1;
+            }
+            state.set_status("❤️ Liked!");
+        }
+        AsyncResult::Unliked { post_id } => {
+            if let Some(post) = state.posts.iter_mut().find(|p| p.network_id == post_id) {
+                post.liked = false;
+                post.like_count = post.like_count.saturating_sub(1);
+            }
+            state.set_status("💔 Unliked");
+        }
+        AsyncResult::Reposted { post_id } => {
+            if let Some(post) = state.posts.iter_mut().find(|p| p.network_id == post_id) {
+                post.reposted = true;
+                post.repost_count += 1;
+            }
+            state.set_status("🔁 Reposted!");
+        }
+        AsyncResult::Posted { posts } => {
+            let networks: Vec<_> = posts.iter().map(|p| p.network.emoji()).collect();
+            state.set_status(format!("✅ Posted to {}", networks.join(" ")));
+            state.loading = false;
+        }
+        AsyncResult::Error { message } => {
+            state.set_status(format!("❌ {}", message));
+            state.loading = false;
+        }
+        AsyncResult::Status { message } => {
+            state.set_status(message);
+        }
+    }
+}
+
+/// Run the TUI in demo mode with mock data (for screenshots)
+pub fn run_demo() -> Result<()> {
+    // Load config
+    let config = Config::load()?;
+
+    // Open database
+    let db = Database::open()?;
+
+    // Initialize terminal
+    enable_raw_mode()?;
+    let mut stdout = stdout();
+    execute!(stdout, EnterAlternateScreen)?;
+    let backend = CrosstermBackend::new(stdout);
+    let mut terminal = Terminal::new(backend)?;
+    terminal.clear()?;
+
+    // Create app state with demo data
+    let mut state = AppState::new(config.clone(), db)?;
+    state.accounts = demo::demo_accounts();
+    state.posts = demo::demo_posts();
+    state.focused_panel = state::FocusedPanel::Timeline;
+    state.set_status(format!("Demo mode | {} posts | Press ? for help | q to quit", state.posts.len()));
+
+    // Main loop (simpler, no async)
+    loop {
+        // Draw UI
+        terminal.draw(|frame| ui::render(frame, &state))?;
+
+        // Handle events
+        if event::poll(Duration::from_millis(50))? {
+            if let Event::Key(key) = event::read()? {
+                // Simple event handling for demo
+                events::handle_key(&mut state, key);
+            }
+        }
+
+        // Tick for animations
+        state.tick();
+
+        if state.should_quit {
+            break;
+        }
+    }
+
+    // Restore terminal
+    disable_raw_mode()?;
+    execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
+    terminal.show_cursor()?;
+
+    // Save config on exit
+    state.config.save()?;
+
+    Ok(())
+}
