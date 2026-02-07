@@ -70,6 +70,12 @@ impl SocialApi for MastodonClient {
             .await
             .context("Failed to post status")?;
 
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            anyhow::bail!("Mastodon error {}: {}", status, body);
+        }
+
         let status: MastodonStatus = response
             .json()
             .await
