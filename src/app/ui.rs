@@ -217,33 +217,36 @@ fn render_timeline_view(frame: &mut Frame, state: &AppState, area: Rect) {
             .enumerate()
             .map(|(i, post)| {
                 let icon = post.network.emoji();
-                let preview = post.preview(45);
+                let preview = post.preview(38);
                 let time = post.relative_time();
                 
                 // Status indicators
-                let like_icon = if post.liked { "❤️" } else { "" };
-                let repost_icon = if post.reposted { "🔁" } else { "" };
+                let mut indicators = String::new();
+                if post.liked { indicators.push_str(" ❤️"); }
+                if post.reposted { indicators.push_str(" 🔁"); }
                 
                 let is_selected = i == state.selected_post;
-                let style = if is_selected {
+                let width = horizontal[1].width.saturating_sub(3) as usize;
+                
+                // Full-width background for selected item
+                let base_style = if is_selected {
                     colors.selected()
                 } else {
-                    colors.text()
+                    Style::default()
                 };
-                let cursor = if is_selected { "▸" } else { " " };
+                
+                let author_text = format!(" {} @{} · {}{}", icon, post.author_handle, time, indicators);
+                let content_text = format!("   {}", preview);
+                
+                // Pad lines to full width for selection highlight
+                let author_padded = format!("{:<width$}", author_text, width = width);
+                let content_padded = format!("{:<width$}", content_text, width = width);
+                let spacer = format!("{:<width$}", "", width = width);
 
                 ListItem::new(vec![
-                    Line::from(vec![
-                        Span::styled(format!(" {} ", cursor), style),
-                        Span::styled(format!("{} @{}", icon, post.author_handle), 
-                            if is_selected { style } else { colors.text_primary() }),
-                        Span::styled(format!(" · {}", time), colors.text_muted()),
-                        Span::styled(format!(" {}{}", like_icon, repost_icon), Style::default()),
-                    ]),
-                    Line::from(vec![
-                        Span::styled("    ", style),
-                        Span::styled(preview, style),
-                    ]),
+                    Line::styled(author_padded, base_style.patch(colors.text_primary())),
+                    Line::styled(content_padded, base_style.patch(colors.text())),
+                    Line::styled(spacer, Style::default()), // Spacer between posts
                 ])
             })
             .collect()
