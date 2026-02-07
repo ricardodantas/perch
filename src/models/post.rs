@@ -113,10 +113,13 @@ impl Post {
     /// Get a short preview of the content (for list display)
     pub fn preview(&self, max_len: usize) -> String {
         let content = self.content.replace('\n', " ");
-        if content.len() <= max_len {
+        // Use chars() to handle multi-byte characters (emojis, etc.) safely
+        let chars: Vec<char> = content.chars().collect();
+        if chars.len() <= max_len {
             content
         } else {
-            format!("{}...", &content[..max_len.saturating_sub(3)])
+            let truncated: String = chars[..max_len.saturating_sub(3)].iter().collect();
+            format!("{}...", truncated)
         }
     }
 
