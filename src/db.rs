@@ -253,13 +253,11 @@ impl Database {
     }
 
     /// Set an account as the default for its network
-    pub fn set_default_account(&self, id: Uuid, network: Network) -> Result<()> {
-        let network_str = format!("{:?}", network).to_lowercase();
-
-        // Unset current default
+    pub fn set_default_account(&self, id: Uuid, _network: Network) -> Result<()> {
+        // Unset ALL current defaults (only one default across all networks)
         self.conn.execute(
-            "UPDATE accounts SET is_default = 0 WHERE network = ?1",
-            params![network_str],
+            "UPDATE accounts SET is_default = 0",
+            params![],
         )?;
 
         // Set new default
