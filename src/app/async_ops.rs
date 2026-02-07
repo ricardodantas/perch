@@ -95,6 +95,8 @@ pub fn spawn_worker() -> AsyncHandle {
                     handle_unrepost(&result_tx, post, account).await;
                 }
                 AsyncCommand::Post { content, accounts, reply_to } => {
+                    eprintln!("[DEBUG] Post command received: content={:?}, accounts={}, reply_to={:?}", 
+                        content.len(), accounts.len(), reply_to.is_some());
                     handle_post(&result_tx, content, accounts, reply_to).await;
                 }
             }
@@ -391,6 +393,7 @@ async fn handle_post(
     accounts: Vec<Account>,
     reply_to: Option<Post>,
 ) {
+    eprintln!("[DEBUG] handle_post called with {} accounts", accounts.len());
     let action = if reply_to.is_some() { "Replying..." } else { "Posting..." };
     let _ = result_tx
         .send(AsyncResult::Status {
@@ -402,9 +405,19 @@ async fn handle_post(
     let mut errors = Vec::new();
 
     for account in &accounts {
+        eprintln!("[DEBUG] Posting to {} @{}", account.network.name(), account.handle);
         let token = match auth::get_credentials(account) {
-            Ok(Some(t)) => t,
+            Ok(Some(t)) => {
+                eprintln!("[DEBUG] Got token for {}", account.handle);
+                t
+            },
+            Ok(None) => {
+                eprintln!("[DEBUG] No credentials for {}", account.handle);
+                errors.push(format!("No credentials for {}", account.network.name()));
+                continue;
+            }
             _ => {
+                eprintln!("[DEBUG] Error getting credentials for {}", account.handle);
                 errors.push(format!("No credentials for {}", account.network.name()));
                 continue;
             }
@@ -413,6 +426,7 @@ async fn handle_post(
         let client = match get_client(account, &token).await {
             Ok(c) => c,
             Err(e) => {
+                eprintln!("[DEBUG] Client error for {}: {}", account.handle, e);
                 errors.push(format!("{}: {}", account.network.name(), e));
                 continue;
             }
@@ -423,6 +437,7 @@ async fn handle_post(
             .filter(|p| p.network == account.network)
             .map(|p| p.network_id.clone());
 
+        eprintln!("[DEBUG] Calling post/reply API...");
         let result = if let Some(ref reply_id) = reply_id {
             client.reply(&content, reply_id).await
         } else {
@@ -431,9 +446,11 @@ async fn handle_post(
 
         match result {
             Ok(post) => {
+                eprintln!("[DEBUG] Post succeeded: {}", post.network_id);
                 posted.push(post);
             }
             Err(e) => {
+                eprintln!("[DEBUG] Post failed: {}", e);
                 errors.push(format!("{}: {}", account.network.name(), e));
             }
         }

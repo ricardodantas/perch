@@ -860,34 +860,29 @@ fn render_compose_popup(frame: &mut Frame, state: &AppState) {
         content.push(Line::from(""));
     }
     
-    // Show network selection toggles
+    // Show network selection toggles - cleaner pill-style
     let has_mastodon = state.accounts.iter().any(|a| a.network == crate::models::Network::Mastodon);
     let has_bluesky = state.accounts.iter().any(|a| a.network == crate::models::Network::Bluesky);
     let mastodon_selected = state.compose_networks.contains(&crate::models::Network::Mastodon);
     let bluesky_selected = state.compose_networks.contains(&crate::models::Network::Bluesky);
     
-    let mut network_spans = vec![Span::styled("  Post to: ", colors.text_dim())];
+    let mut network_spans = vec![Span::styled("  ", Style::default())];
     
     if has_mastodon {
-        let style = if mastodon_selected {
-            colors.text_primary().add_modifier(Modifier::BOLD)
+        if mastodon_selected {
+            network_spans.push(Span::styled(" 🐘 Mastodon ✓ ", colors.selected()));
         } else {
-            colors.text_dim()
-        };
-        let indicator = if mastodon_selected { "☑" } else { "☐" };
-        network_spans.push(Span::styled(format!("{} 🐘 Mastodon ", indicator), style));
-        network_spans.push(Span::styled("(1) ", colors.text_dim()));
+            network_spans.push(Span::styled(" 🐘 Mastodon ", colors.text_dim()));
+        }
+        network_spans.push(Span::styled(" ", Style::default()));
     }
     
     if has_bluesky {
-        let style = if bluesky_selected {
-            colors.text_primary().add_modifier(Modifier::BOLD)
+        if bluesky_selected {
+            network_spans.push(Span::styled(" 🦋 Bluesky ✓ ", colors.selected()));
         } else {
-            colors.text_dim()
-        };
-        let indicator = if bluesky_selected { "☑" } else { "☐" };
-        network_spans.push(Span::styled(format!("{} 🦋 Bluesky ", indicator), style));
-        network_spans.push(Span::styled("(2)", colors.text_dim()));
+            network_spans.push(Span::styled(" 🦋 Bluesky ", colors.text_dim()));
+        }
     }
     
     if !has_mastodon && !has_bluesky {
@@ -895,6 +890,14 @@ fn render_compose_popup(frame: &mut Frame, state: &AppState) {
     }
     
     content.push(Line::from(network_spans));
+    content.push(Line::from(vec![
+        Span::styled("  ", Style::default()),
+        Span::styled("Press ", colors.text_dim()),
+        Span::styled("1", colors.key_hint()),
+        Span::styled("/", colors.text_dim()),
+        Span::styled("2", colors.key_hint()),
+        Span::styled(" to toggle", colors.text_dim()),
+    ]));
     content.push(Line::from(""));
     
     content.push(Line::from(vec![
@@ -945,7 +948,7 @@ fn render_compose_popup(frame: &mut Frame, state: &AppState) {
     
     // Show cursor position - adjust for reply context and network line
     let reply_offset = if state.reply_to.is_some() { 2u16 } else { 0 };
-    let network_offset = 2u16; // network selection line + empty line
+    let network_offset = 3u16; // network pills + hint line + empty line
     let cursor_x = popup_area.x + 3 + state.compose_text.lines().last().map(|l| l.len()).unwrap_or(0) as u16;
     let cursor_y = popup_area.y + 2 + reply_offset + network_offset + state.compose_text.lines().count().saturating_sub(1) as u16;
     if cursor_x < popup_area.x + popup_area.width - 1 && cursor_y < popup_area.y + popup_area.height - 2 {
