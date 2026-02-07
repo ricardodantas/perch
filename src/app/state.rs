@@ -135,6 +135,8 @@ pub struct AppState {
     pub compose_text: String,
     /// Networks to post to (for cross-posting)
     pub compose_networks: Vec<Network>,
+    /// Reply-to post (if replying)
+    pub reply_to: Option<Post>,
 
     /// Search query
     pub search_query: String,
@@ -182,6 +184,7 @@ impl AppState {
             timeline_scroll: 0,
             compose_text: String::new(),
             compose_networks: vec![Network::Mastodon, Network::Bluesky],
+            reply_to: None,
             search_query: String::new(),
             search_results: Vec::new(),
             status: String::new(),
@@ -278,6 +281,7 @@ impl AppState {
     pub fn open_compose(&mut self) {
         self.mode = Mode::Compose;
         self.compose_text.clear();
+        self.reply_to = None;
         // Pre-select networks based on configured accounts
         self.compose_networks = self.accounts
             .iter()
@@ -287,9 +291,19 @@ impl AppState {
             .collect();
     }
 
+    /// Open reply view for a specific post
+    pub fn open_reply(&mut self, post: Post) {
+        self.mode = Mode::Compose;
+        self.compose_text = format!("@{} ", post.author_handle);
+        self.reply_to = Some(post.clone());
+        // Only select the network of the post we're replying to
+        self.compose_networks = vec![post.network];
+    }
+
     /// Close compose view
     pub fn close_compose(&mut self) {
         self.mode = Mode::Normal;
+        self.reply_to = None;
     }
 
     /// Toggle network in compose

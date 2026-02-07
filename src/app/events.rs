@@ -135,6 +135,7 @@ fn handle_timeline_key(state: &mut AppState, key: KeyEvent) -> Option<AsyncComma
             None
         }
         (_, KeyCode::Char('r')) => {
+            // Refresh timeline
             if !state.loading && !state.accounts.is_empty() {
                 state.loading = true;
                 state.set_status("Refreshing...");
@@ -144,6 +145,13 @@ fn handle_timeline_key(state: &mut AppState, key: KeyEvent) -> Option<AsyncComma
             } else {
                 None
             }
+        }
+        (KeyModifiers::SHIFT, KeyCode::Char('R')) => {
+            // Reply to selected post
+            if let Some(post) = state.selected_post().cloned() {
+                state.open_reply(post);
+            }
+            None
         }
         (_, KeyCode::Char('o')) => {
             // Open selected post in browser
@@ -245,6 +253,7 @@ fn handle_compose_key(state: &mut AppState, key: KeyEvent) -> Option<AsyncComman
             // Post
             if !state.compose_text.is_empty() && !state.compose_networks.is_empty() {
                 let content = state.compose_text.clone();
+                let reply_to = state.reply_to.clone();
                 // Find accounts matching selected networks
                 let accounts: Vec<_> = state
                     .accounts
@@ -260,7 +269,7 @@ fn handle_compose_key(state: &mut AppState, key: KeyEvent) -> Option<AsyncComman
                 
                 state.loading = true;
                 state.close_compose();
-                Some(AsyncCommand::Post { content, accounts })
+                Some(AsyncCommand::Post { content, accounts, reply_to })
             } else {
                 if state.compose_text.is_empty() {
                     state.set_status("⚠ Write something first!");

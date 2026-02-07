@@ -24,6 +24,7 @@ pub enum AsyncCommand {
     Post {
         content: String,
         accounts: Vec<Account>,
+        reply_to: Option<Post>,
     },
     /// Shutdown the worker
     Shutdown,
@@ -78,8 +79,8 @@ pub fn spawn_worker() -> AsyncHandle {
                 AsyncCommand::Repost { post, account } => {
                     handle_repost(&result_tx, post, account).await;
                 }
-                AsyncCommand::Post { content, accounts } => {
-                    handle_post(&result_tx, content, accounts).await;
+                AsyncCommand::Post { content, accounts, reply_to } => {
+                    handle_post(&result_tx, content, accounts, reply_to).await;
                 }
             }
         }
@@ -286,10 +287,12 @@ async fn handle_post(
     result_tx: &mpsc::Sender<AsyncResult>,
     content: String,
     accounts: Vec<Account>,
+    reply_to: Option<Post>,
 ) {
+    let action = if reply_to.is_some() { "Replying..." } else { "Posting..." };
     let _ = result_tx
         .send(AsyncResult::Status {
-            message: "Posting...".to_string(),
+            message: action.to_string(),
         })
         .await;
 
@@ -313,7 +316,18 @@ async fn handle_post(
             }
         };
 
-        match client.post(&content).await {
+        // Check if we're replying and this account matches the reply network
+        let reply_id = reply_to.as_ref()
+            .filter(|p| p.network == account.network)
+            .map(|p| p.network_id.clone());
+
+        let result = if let Some(ref reply_id) = reply_id {
+            client.reply(&content, reply_id).await
+        } else {
+            client.post(&content).await
+        };
+
+        match result {
             Ok(post) => {
                 posted.push(post);
             }
@@ -329,6 +343,7 @@ async fn handle_post(
             .await;
     }
 
+    let success_msg = if reply_to.is_some() { "Replied successfully!" } else { "Posted successfully!" };
     if !errors.is_empty() {
         let _ = result_tx
             .send(AsyncResult::Error {
@@ -338,7 +353,7 @@ async fn handle_post(
     } else {
         let _ = result_tx
             .send(AsyncResult::Status {
-                message: "Posted successfully!".to_string(),
+                message: success_msg.to_string(),
             })
             .await;
     }

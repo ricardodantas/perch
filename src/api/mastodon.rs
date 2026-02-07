@@ -84,6 +84,39 @@ impl SocialApi for MastodonClient {
         Ok(status.into_post())
     }
 
+    async fn reply(&self, content: &str, reply_to_id: &str) -> Result<Post> {
+        let url = self.api_url("/statuses");
+
+        let request = PostStatusRequest {
+            status: content.to_string(),
+            visibility: Some("public".to_string()),
+            in_reply_to_id: Some(reply_to_id.to_string()),
+            ..Default::default()
+        };
+
+        let response = self
+            .client
+            .post(&url)
+            .header("Authorization", format!("Bearer {}", self.access_token))
+            .json(&request)
+            .send()
+            .await
+            .context("Failed to post reply")?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            anyhow::bail!("Mastodon error {}: {}", status, body);
+        }
+
+        let status: MastodonStatus = response
+            .json()
+            .await
+            .context("Failed to parse reply response")?;
+
+        Ok(status.into_post())
+    }
+
     async fn like(&self, post: &Post) -> Result<()> {
         let url = self.api_url(&format!("/statuses/{}/favourite", post.network_id));
 

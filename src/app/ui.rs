@@ -483,6 +483,10 @@ fn render_help_popup(frame: &mut Frame, state: &AppState) {
             Span::styled("Compose new post", colors.text()),
         ]),
         Line::from(vec![
+            Span::styled("  R                ", colors.key_hint()),
+            Span::styled("Reply to post", colors.text()),
+        ]),
+        Line::from(vec![
             Span::styled("  r                ", colors.key_hint()),
             Span::styled("Refresh timeline", colors.text()),
         ]),
@@ -736,36 +740,46 @@ fn render_compose_popup(frame: &mut Frame, state: &AppState) {
     let char_count = state.compose_text.len();
     let max_chars = 500; // Mastodon default, Bluesky is 300
     
-    let content = vec![
-        Line::from(""),
-        Line::from(vec![
-            Span::styled("  ", Style::default()),
-            Span::styled(
-                if state.compose_text.is_empty() {
-                    "What's on your mind?"
-                } else {
-                    &state.compose_text
-                },
-                if state.compose_text.is_empty() {
-                    colors.text_muted()
-                } else {
-                    colors.text()
-                },
-            ),
-        ]),
-        Line::from(""),
-        Line::from(vec![
-            Span::styled(format!("  {}/{} ", char_count, max_chars), 
-                if char_count > max_chars { colors.text_error() } else { colors.text_dim() }),
-            Span::styled("│ ", colors.text_dim()),
-            Span::styled("Ctrl+↵", colors.key_hint()),
-            Span::styled(" post ", colors.text_muted()),
-            Span::styled("Esc", colors.key_hint()),
-            Span::styled(" cancel", colors.text_muted()),
-        ]),
-    ];
+    let mut content = vec![Line::from("")];
+    
+    // Show reply context if replying
+    if let Some(ref reply_to) = state.reply_to {
+        content.push(Line::from(vec![
+            Span::styled("  ↩ Replying to ", colors.text_dim()),
+            Span::styled(format!("@{}", reply_to.author_handle), colors.text_primary()),
+        ]));
+        content.push(Line::from(""));
+    }
+    
+    content.push(Line::from(vec![
+        Span::styled("  ", Style::default()),
+        Span::styled(
+            if state.compose_text.is_empty() {
+                if state.reply_to.is_some() { "Write your reply..." } else { "What's on your mind?" }
+            } else {
+                &state.compose_text
+            },
+            if state.compose_text.is_empty() {
+                colors.text_muted()
+            } else {
+                colors.text()
+            },
+        ),
+    ]));
+    content.push(Line::from(""));
+    content.push(Line::from(vec![
+        Span::styled(format!("  {}/{} ", char_count, max_chars), 
+            if char_count > max_chars { colors.text_error() } else { colors.text_dim() }),
+        Span::styled("│ ", colors.text_dim()),
+        Span::styled("Ctrl+↵", colors.key_hint()),
+        Span::styled(if state.reply_to.is_some() { " reply " } else { " post " }, colors.text_muted()),
+        Span::styled("Esc", colors.key_hint()),
+        Span::styled(" cancel", colors.text_muted()),
+    ]));
 
-    let title = if state.compose_networks.is_empty() {
+    let title = if state.reply_to.is_some() {
+        format!(" ↩ Reply → {} ", networks_str)
+    } else if state.compose_networks.is_empty() {
         " 📝 Compose (Alt+1 🐘 Alt+2 🦋) ".to_string()
     } else {
         format!(" 📝 Compose → {} ", networks_str)
@@ -785,9 +799,10 @@ fn render_compose_popup(frame: &mut Frame, state: &AppState) {
 
     frame.render_widget(compose, popup_area);
     
-    // Show cursor position
+    // Show cursor position - adjust for reply context
+    let reply_offset = if state.reply_to.is_some() { 2u16 } else { 0 };
     let cursor_x = popup_area.x + 3 + state.compose_text.lines().last().map(|l| l.len()).unwrap_or(0) as u16;
-    let cursor_y = popup_area.y + 2 + state.compose_text.lines().count().saturating_sub(1) as u16;
+    let cursor_y = popup_area.y + 2 + reply_offset + state.compose_text.lines().count().saturating_sub(1) as u16;
     if cursor_x < popup_area.x + popup_area.width - 1 && cursor_y < popup_area.y + popup_area.height - 2 {
         frame.set_cursor_position((cursor_x, cursor_y));
     }

@@ -16,6 +16,9 @@ pub trait SocialApi {
     /// Post a new status
     async fn post(&self, content: &str) -> Result<Post>;
 
+    /// Reply to a post
+    async fn reply(&self, content: &str, reply_to_id: &str) -> Result<Post>;
+
     /// Like/favorite a post
     async fn like(&self, post: &Post) -> Result<()>;
 
@@ -51,6 +54,14 @@ impl Client {
         match self {
             Client::Mastodon(c) => c.post(content).await,
             Client::Bluesky(c) => c.post(content).await,
+        }
+    }
+
+    /// Reply to a post
+    pub async fn reply(&self, content: &str, reply_to_id: &str) -> Result<Post> {
+        match self {
+            Client::Mastodon(c) => c.reply(content, reply_to_id).await,
+            Client::Bluesky(c) => c.reply(content, reply_to_id).await,
         }
     }
 

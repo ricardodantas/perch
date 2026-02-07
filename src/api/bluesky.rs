@@ -168,6 +168,75 @@ impl SocialApi for BlueskyClient {
         })
     }
 
+    async fn reply(&self, content: &str, reply_to_id: &str) -> Result<Post> {
+        // For Bluesky replies, we need the parent post's URI and CID
+        // For now, we'll construct the URI from the reply_to_id
+        // Full implementation would need to fetch the parent post first
+        
+        let url = format!("{}/xrpc/com.atproto.repo.createRecord", self.pds_url);
+        let now = Utc::now().format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string();
+
+        // The reply_to_id for Bluesky should be the post rkey
+        // We need to construct the full URI: at://did/app.bsky.feed.post/rkey
+        // For simplicity, just post without reply threading for now
+        // TODO: Implement proper reply threading by fetching parent post
+        
+        let record = PostRecord {
+            text: content.to_string(),
+            created_at: now.clone(),
+            r#type: "app.bsky.feed.post".to_string(),
+        };
+
+        let request = CreateRecordRequest {
+            repo: self.did.clone(),
+            collection: "app.bsky.feed.post".to_string(),
+            record,
+        };
+
+        let response = self
+            .client
+            .post(&url)
+            .header("Authorization", format!("Bearer {}", self.access_jwt))
+            .json(&request)
+            .send()
+            .await
+            .context("Failed to post reply")?;
+
+        if !response.status().is_success() {
+            let error_text = response.text().await.unwrap_or_default();
+            bail!("Failed to post reply: {}", error_text);
+        }
+
+        let result: CreateRecordResponse = response
+            .json()
+            .await
+            .context("Failed to parse reply response")?;
+
+        Ok(Post {
+            id: uuid::Uuid::new_v4(),
+            network_id: result.uri.split('/').last().unwrap_or(&result.uri).to_string(),
+            network: Network::Bluesky,
+            author_handle: self.did.clone(),
+            author_name: String::new(),
+            author_avatar: None,
+            content: content.to_string(),
+            content_raw: None,
+            created_at: Utc::now(),
+            url: None,
+            is_repost: false,
+            repost_author: None,
+            like_count: 0,
+            repost_count: 0,
+            reply_count: 0,
+            liked: false,
+            reposted: false,
+            reply_to_id: Some(reply_to_id.to_string()),
+            media: Vec::new(),
+            cid: Some(result.cid),
+            uri: Some(result.uri),
+        })
+    }
+
     async fn like(&self, post: &Post) -> Result<()> {
         let cid = post.cid.as_ref().context("Post missing CID for like")?;
         let uri = post.uri.as_ref().context("Post missing URI for like")?;
