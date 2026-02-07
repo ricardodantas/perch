@@ -427,11 +427,11 @@ fn handle_compose_key(state: &mut AppState, key: KeyEvent) -> Option<AsyncComman
                 None
             }
         }
-        (KeyModifiers::ALT, KeyCode::Char('1')) => {
+        (_, KeyCode::Char('1')) => {
             state.toggle_compose_network(Network::Mastodon);
             None
         }
-        (KeyModifiers::ALT, KeyCode::Char('2')) => {
+        (_, KeyCode::Char('2')) => {
             state.toggle_compose_network(Network::Bluesky);
             None
         }

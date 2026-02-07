@@ -611,11 +611,11 @@ fn render_help_popup(frame: &mut Frame, state: &AppState) {
             colors.text_primary().add_modifier(Modifier::BOLD),
         )]),
         Line::from(vec![
-            Span::styled("  Alt+1            ", colors.key_hint()),
+            Span::styled("  1                  ", colors.key_hint()),
             Span::styled("Toggle Mastodon", colors.text()),
         ]),
         Line::from(vec![
-            Span::styled("  Alt+2            ", colors.key_hint()),
+            Span::styled("  2                  ", colors.key_hint()),
             Span::styled("Toggle Bluesky", colors.text()),
         ]),
         Line::from(vec![
@@ -876,7 +876,7 @@ fn render_compose_popup(frame: &mut Frame, state: &AppState) {
         };
         let indicator = if mastodon_selected { "☑" } else { "☐" };
         network_spans.push(Span::styled(format!("{} 🐘 Mastodon ", indicator), style));
-        network_spans.push(Span::styled("(Alt+1) ", colors.text_dim()));
+        network_spans.push(Span::styled("(1) ", colors.text_dim()));
     }
     
     if has_bluesky {
@@ -887,7 +887,7 @@ fn render_compose_popup(frame: &mut Frame, state: &AppState) {
         };
         let indicator = if bluesky_selected { "☑" } else { "☐" };
         network_spans.push(Span::styled(format!("{} 🦋 Bluesky ", indicator), style));
-        network_spans.push(Span::styled("(Alt+2)", colors.text_dim()));
+        network_spans.push(Span::styled("(2)", colors.text_dim()));
     }
     
     if !has_mastodon && !has_bluesky {
