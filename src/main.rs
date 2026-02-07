@@ -421,13 +421,18 @@ fn list_accounts() -> Result<()> {
     
     for account in accounts {
         let default_marker = if account.is_default { " (default)" } else { "" };
+        let has_creds = perch::auth::has_credentials(&account);
+        let cred_status = if has_creds { "✓" } else { "✗ no credentials" };
+        
         println!(
-            "  {} {} @{}{}\n    Server: {}",
+            "  {} {} @{}{}\n    Server: {}\n    Auth: {} (key: {})",
             account.network.emoji(),
             account.display_name,
             account.handle,
             default_marker,
-            account.server
+            account.server,
+            cred_status,
+            account.keyring_key()
         );
     }
     
