@@ -392,12 +392,19 @@ fn handle_accounts_key(state: &mut AppState, key: KeyEvent) -> Option<AsyncComma
 }
 
 fn handle_compose_key(state: &mut AppState, key: KeyEvent) -> Option<AsyncCommand> {
+    // Debug: log every keypress in compose mode
+    eprintln!("[DEBUG] Compose key: {:?} modifiers: {:?}", key.code, key.modifiers);
+    
     match (key.modifiers, key.code) {
         (_, KeyCode::Esc) => {
             state.close_compose();
             None
         }
-        (KeyModifiers::CONTROL, KeyCode::Enter) => {
+        // Ctrl+Enter or Ctrl+S or Tab to post
+        (KeyModifiers::CONTROL, KeyCode::Enter) 
+        | (KeyModifiers::CONTROL, KeyCode::Char('s')) 
+        | (_, KeyCode::Tab) => {
+            eprintln!("[DEBUG] Post triggered!");
             // Post
             if !state.compose_text.is_empty() && !state.compose_networks.is_empty() {
                 let content = state.compose_text.clone();
@@ -409,6 +416,9 @@ fn handle_compose_key(state: &mut AppState, key: KeyEvent) -> Option<AsyncComman
                     .filter(|a| state.compose_networks.contains(&a.network))
                     .cloned()
                     .collect();
+                
+                eprintln!("[DEBUG] Content: {:?}, Networks: {:?}, Accounts: {}", 
+                    content.len(), state.compose_networks.len(), accounts.len());
                 
                 if accounts.is_empty() {
                     state.set_status("⚠ No accounts for selected networks");
@@ -427,11 +437,11 @@ fn handle_compose_key(state: &mut AppState, key: KeyEvent) -> Option<AsyncComman
                 None
             }
         }
-        (_, KeyCode::Char('1')) => {
+        (_, KeyCode::F(1)) => {
             state.toggle_compose_network(Network::Mastodon);
             None
         }
-        (_, KeyCode::Char('2')) => {
+        (_, KeyCode::F(2)) => {
             state.toggle_compose_network(Network::Bluesky);
             None
         }

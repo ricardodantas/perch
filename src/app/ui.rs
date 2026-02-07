@@ -611,15 +611,15 @@ fn render_help_popup(frame: &mut Frame, state: &AppState) {
             colors.text_primary().add_modifier(Modifier::BOLD),
         )]),
         Line::from(vec![
-            Span::styled("  1                  ", colors.key_hint()),
+            Span::styled("  F1               ", colors.key_hint()),
             Span::styled("Toggle Mastodon", colors.text()),
         ]),
         Line::from(vec![
-            Span::styled("  2                  ", colors.key_hint()),
+            Span::styled("  F2               ", colors.key_hint()),
             Span::styled("Toggle Bluesky", colors.text()),
         ]),
         Line::from(vec![
-            Span::styled("  Ctrl+Enter       ", colors.key_hint()),
+            Span::styled("  Tab              ", colors.key_hint()),
             Span::styled("Send post", colors.text()),
         ]),
         Line::from(vec![
@@ -892,11 +892,14 @@ fn render_compose_popup(frame: &mut Frame, state: &AppState) {
     content.push(Line::from(network_spans));
     content.push(Line::from(vec![
         Span::styled("  ", Style::default()),
-        Span::styled("Press ", colors.text_dim()),
-        Span::styled("1", colors.key_hint()),
+        Span::styled("F1", colors.key_hint()),
         Span::styled("/", colors.text_dim()),
-        Span::styled("2", colors.key_hint()),
-        Span::styled(" to toggle", colors.text_dim()),
+        Span::styled("F2", colors.key_hint()),
+        Span::styled(" toggle  ", colors.text_dim()),
+        Span::styled("Tab", colors.key_hint()),
+        Span::styled(" send  ", colors.text_dim()),
+        Span::styled("Esc", colors.key_hint()),
+        Span::styled(" cancel", colors.text_dim()),
     ]));
     content.push(Line::from(""));
     
@@ -917,13 +920,8 @@ fn render_compose_popup(frame: &mut Frame, state: &AppState) {
     ]));
     content.push(Line::from(""));
     content.push(Line::from(vec![
-        Span::styled(format!("  {}/{} ", char_count, max_chars), 
+        Span::styled(format!("  {}/{}", char_count, max_chars), 
             if char_count > max_chars { colors.text_error() } else { colors.text_dim() }),
-        Span::styled("│ ", colors.text_dim()),
-        Span::styled("Ctrl+↵", colors.key_hint()),
-        Span::styled(if state.reply_to.is_some() { " reply " } else { " post " }, colors.text_muted()),
-        Span::styled("Esc", colors.key_hint()),
-        Span::styled(" cancel", colors.text_muted()),
     ]));
 
     let title = if state.reply_to.is_some() {
