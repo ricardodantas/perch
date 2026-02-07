@@ -168,7 +168,6 @@ fn render_timeline_view(frame: &mut Frame, state: &AppState, area: Rect) {
             .enumerate()
             .map(|(i, post)| {
                 let icon = post.network.emoji();
-                let preview = post.preview(38);
                 let time = post.relative_time();
                 
                 // Status indicators
@@ -178,6 +177,10 @@ fn render_timeline_view(frame: &mut Frame, state: &AppState, area: Rect) {
                 
                 let is_selected = i == state.selected_post;
                 let width = horizontal[0].width.saturating_sub(3) as usize;
+                
+                // Preview should use available width minus the indent
+                let preview_width = width.saturating_sub(4); // 3 spaces indent + margin
+                let preview = post.preview(preview_width);
                 
                 // Full-width background for selected item
                 let base_style = if is_selected {
