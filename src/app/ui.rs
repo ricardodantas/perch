@@ -443,14 +443,13 @@ fn render_help_popup(frame: &mut Frame, state: &AppState) {
     let colors = state.theme.colors();
     let area = frame.area();
 
-    // Calculate popup size
-    let popup_width = 60u16.min(area.width.saturating_sub(4));
-    let popup_height = 28u16.min(area.height.saturating_sub(4));
+    // Same dimensions as Hazelnut: 50% width, 70% height
+    let popup_area = centered_rect(50, 70, area);
 
-    let popup_area = centered_rect(popup_width, popup_height, area);
-
-    // Clear the area
+    // First render a solid background block to cover everything underneath
+    let bg_block = Block::default().style(Style::default().bg(colors.bg_secondary));
     frame.render_widget(Clear, popup_area);
+    frame.render_widget(bg_block, popup_area);
 
     let help_content = vec![
         Line::from(""),
@@ -559,7 +558,11 @@ fn render_theme_picker(frame: &mut Frame, state: &AppState) {
 
     // Same dimensions as Hazelnut: 50% width, 70% height
     let popup_area = centered_rect(50, 70, area);
+
+    // First render a solid background block to cover everything underneath
+    let bg_block = Block::default().style(Style::default().bg(colors.bg));
     frame.render_widget(Clear, popup_area);
+    frame.render_widget(bg_block, popup_area);
 
     let themes = Theme::all();
     let items: Vec<ListItem> = themes
@@ -582,32 +585,34 @@ fn render_theme_picker(frame: &mut Frame, state: &AppState) {
                     .bg(palette.selection)
                     .add_modifier(Modifier::BOLD)
             } else {
-                Style::default().fg(palette.fg)
+                Style::default().fg(palette.fg).bg(colors.bg)
             };
 
             ListItem::new(Line::from(vec![
                 Span::styled(preview, style),
-                Span::styled("█", Style::default().fg(palette.accent)),
-                Span::styled("█", Style::default().fg(palette.secondary)),
-                Span::styled("█", Style::default().fg(palette.success)),
-                Span::styled("█", Style::default().fg(palette.warning)),
+                Span::styled("█", Style::default().fg(palette.accent).bg(colors.bg)),
+                Span::styled("█", Style::default().fg(palette.secondary).bg(colors.bg)),
+                Span::styled("█", Style::default().fg(palette.success).bg(colors.bg)),
+                Span::styled("█", Style::default().fg(palette.warning).bg(colors.bg)),
             ]))
         })
         .collect();
 
-    let theme_list = List::new(items).block(
-        Block::default()
-            .borders(Borders::ALL)
-            .border_style(Style::default().fg(colors.primary))
-            .border_type(BorderType::Rounded)
-            .style(Style::default().bg(colors.bg))
-            .title(format!(
-                " 🎨 Select Theme ({}/{}) ",
-                state.theme_picker_index + 1,
-                themes.len()
-            ))
-            .title_bottom(Line::from(" ↑↓ navigate │ ↵ apply │ Esc cancel ").centered()),
-    );
+    let theme_list = List::new(items)
+        .style(Style::default().bg(colors.bg))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(colors.primary))
+                .border_type(BorderType::Rounded)
+                .style(Style::default().bg(colors.bg))
+                .title(format!(
+                    " 🎨 Select Theme ({}/{}) ",
+                    state.theme_picker_index + 1,
+                    themes.len()
+                ))
+                .title_bottom(Line::from(" ↑↓ navigate │ ↵ apply │ Esc cancel ").centered()),
+        );
 
     frame.render_widget(theme_list, popup_area);
 }
@@ -618,7 +623,11 @@ fn render_about_dialog(frame: &mut Frame, state: &AppState) {
 
     // Same dimensions as Hazelnut: 80% width, 60% height
     let popup_area = centered_rect(80, 60, area);
+
+    // First render a solid background block to cover everything underneath
+    let bg_block = Block::default().style(Style::default().bg(colors.bg));
     frame.render_widget(Clear, popup_area);
+    frame.render_widget(bg_block, popup_area);
 
     let version = env!("CARGO_PKG_VERSION");
     let repo = "https://github.com/ricardodantas/perch";
@@ -825,9 +834,9 @@ fn render_search_popup(frame: &mut Frame, state: &AppState) {
 }
 
 /// Helper function to create a centered rect
-fn centered_rect(width: u16, height: u16, r: Rect) -> Rect {
-    let popup_width = width.min(r.width.saturating_sub(2));
-    let popup_height = height.min(r.height.saturating_sub(2));
+fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
+    let popup_width = r.width * percent_x / 100;
+    let popup_height = r.height * percent_y / 100;
     Rect {
         x: r.x + (r.width.saturating_sub(popup_width)) / 2,
         y: r.y + (r.height.saturating_sub(popup_height)) / 2,
