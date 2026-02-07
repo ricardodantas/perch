@@ -6,8 +6,7 @@ use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitEx
 
 use perch::api::SocialApi;
 
-#[tokio::main]
-async fn main() -> Result<()> {
+fn main() -> Result<()> {
     // Initialize logging (RUST_LOG=debug for verbose output)
     tracing_subscriber::registry()
         .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("warn")))
@@ -18,9 +17,15 @@ async fn main() -> Result<()> {
     match parse_args()? {
         Command::Run => run_tui(),
         Command::Demo => run_demo(),
-        Command::Auth { network, instance } => auth_flow(&network, instance.as_deref()).await,
-        Command::Post { content, networks } => post_cli(&content, &networks).await,
-        Command::Timeline { network, limit } => timeline_cli(network.as_deref(), limit).await,
+        Command::Auth { network, instance } => {
+            tokio::runtime::Runtime::new()?.block_on(auth_flow(&network, instance.as_deref()))
+        }
+        Command::Post { content, networks } => {
+            tokio::runtime::Runtime::new()?.block_on(post_cli(&content, &networks))
+        }
+        Command::Timeline { network, limit } => {
+            tokio::runtime::Runtime::new()?.block_on(timeline_cli(network.as_deref(), limit))
+        }
         Command::Accounts => list_accounts(),
         Command::Help => {
             print_help();
