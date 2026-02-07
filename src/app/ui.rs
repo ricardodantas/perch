@@ -846,13 +846,6 @@ fn render_compose_popup(frame: &mut Frame, state: &AppState) {
     frame.render_widget(Clear, popup_area);
     frame.render_widget(bg_block, popup_area);
 
-    let networks_str: String = state
-        .compose_networks
-        .iter()
-        .map(|n| n.emoji())
-        .collect::<Vec<_>>()
-        .join(" ");
-
     let char_count = state.compose_text.len();
     let max_chars = 500; // Mastodon default, Bluesky is 300
     
@@ -866,6 +859,43 @@ fn render_compose_popup(frame: &mut Frame, state: &AppState) {
         ]));
         content.push(Line::from(""));
     }
+    
+    // Show network selection toggles
+    let has_mastodon = state.accounts.iter().any(|a| a.network == crate::models::Network::Mastodon);
+    let has_bluesky = state.accounts.iter().any(|a| a.network == crate::models::Network::Bluesky);
+    let mastodon_selected = state.compose_networks.contains(&crate::models::Network::Mastodon);
+    let bluesky_selected = state.compose_networks.contains(&crate::models::Network::Bluesky);
+    
+    let mut network_spans = vec![Span::styled("  Post to: ", colors.text_dim())];
+    
+    if has_mastodon {
+        let style = if mastodon_selected {
+            colors.text_primary().add_modifier(Modifier::BOLD)
+        } else {
+            colors.text_dim()
+        };
+        let indicator = if mastodon_selected { "☑" } else { "☐" };
+        network_spans.push(Span::styled(format!("{} 🐘 Mastodon ", indicator), style));
+        network_spans.push(Span::styled("(Alt+1) ", colors.text_dim()));
+    }
+    
+    if has_bluesky {
+        let style = if bluesky_selected {
+            colors.text_primary().add_modifier(Modifier::BOLD)
+        } else {
+            colors.text_dim()
+        };
+        let indicator = if bluesky_selected { "☑" } else { "☐" };
+        network_spans.push(Span::styled(format!("{} 🦋 Bluesky ", indicator), style));
+        network_spans.push(Span::styled("(Alt+2)", colors.text_dim()));
+    }
+    
+    if !has_mastodon && !has_bluesky {
+        network_spans.push(Span::styled("No accounts configured!", colors.text_error()));
+    }
+    
+    content.push(Line::from(network_spans));
+    content.push(Line::from(""));
     
     content.push(Line::from(vec![
         Span::styled("  ", Style::default()),
@@ -894,11 +924,9 @@ fn render_compose_popup(frame: &mut Frame, state: &AppState) {
     ]));
 
     let title = if state.reply_to.is_some() {
-        format!(" ↩ Reply → {} ", networks_str)
-    } else if state.compose_networks.is_empty() {
-        " 📝 Compose (Alt+1 🐘 Alt+2 🦋) ".to_string()
+        " ↩ Reply ".to_string()
     } else {
-        format!(" 📝 Compose → {} ", networks_str)
+        " 📝 Compose ".to_string()
     };
 
     let compose = Paragraph::new(content)
@@ -915,10 +943,11 @@ fn render_compose_popup(frame: &mut Frame, state: &AppState) {
 
     frame.render_widget(compose, popup_area);
     
-    // Show cursor position - adjust for reply context
+    // Show cursor position - adjust for reply context and network line
     let reply_offset = if state.reply_to.is_some() { 2u16 } else { 0 };
+    let network_offset = 2u16; // network selection line + empty line
     let cursor_x = popup_area.x + 3 + state.compose_text.lines().last().map(|l| l.len()).unwrap_or(0) as u16;
-    let cursor_y = popup_area.y + 2 + reply_offset + state.compose_text.lines().count().saturating_sub(1) as u16;
+    let cursor_y = popup_area.y + 2 + reply_offset + network_offset + state.compose_text.lines().count().saturating_sub(1) as u16;
     if cursor_x < popup_area.x + popup_area.width - 1 && cursor_y < popup_area.y + popup_area.height - 2 {
         frame.set_cursor_position((cursor_x, cursor_y));
     }
