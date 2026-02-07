@@ -1,42 +1,120 @@
-//! UI rendering
+//! UI rendering for the TUI
 
-use ratatui::prelude::*;
-use ratatui::widgets::{Block, Borders, List, ListItem, Paragraph, Wrap, BorderType};
+use ratatui::{
+    Frame,
+    layout::{Alignment, Constraint, Direction, Layout, Rect},
+    style::{Modifier, Style},
+    text::{Line, Span},
+    widgets::{Block, BorderType, Borders, Clear, List, ListItem, Paragraph, Tabs, Wrap},
+};
 
-use super::state::{AppState, FocusedPanel, View};
+use super::state::{AppState, FocusedPanel, Mode, TimelineFilter, View};
+use crate::theme::Theme;
+
+/// ASCII art logo for Perch
+const LOGO: &str = r#"
+██████╗ ███████╗██████╗  ██████╗██╗  ██╗
+██╔══██╗██╔════╝██╔══██╗██╔════╝██║  ██║
+██████╔╝█████╗  ██████╔╝██║     ███████║
+██╔═══╝ ██╔══╝  ██╔══██╗██║     ██╔══██║
+██║     ███████╗██║  ██║╚██████╗██║  ██║
+╚═╝     ╚══════╝╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝
+"#;
+
+/// Perch icon
+const ICON: &str = "🐦";
 
 /// Main render function
 pub fn render(frame: &mut Frame, state: &AppState) {
     let colors = state.theme.colors();
 
-    // Clear with background color
+    // Set background
     let area = frame.area();
-    frame.render_widget(
-        Block::default().style(Style::default().bg(colors.bg)),
-        area,
-    );
+    let bg_block = Block::default().style(Style::default().bg(colors.bg));
+    frame.render_widget(bg_block, area);
 
-    match state.view {
-        View::Timeline => render_timeline(frame, state),
-        View::Compose => render_compose(frame, state),
-        View::Search => render_search(frame, state),
-        View::Help => render_help(frame, state),
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(3), // Tabs
+            Constraint::Min(0),    // Main content
+            Constraint::Length(1), // Status bar
+        ])
+        .split(area);
+
+    render_tabs(frame, state, chunks[0]);
+    render_main(frame, state, chunks[1]);
+    render_status_bar(frame, state, chunks[2]);
+
+    // Render modal dialogs
+    match state.mode {
+        Mode::Help => render_help_popup(frame, state),
+        Mode::ThemePicker => render_theme_picker(frame, state),
+        Mode::About => render_about_dialog(frame, state),
+        Mode::Compose => render_compose_popup(frame, state),
+        Mode::Search => render_search_popup(frame, state),
+        Mode::Normal => {}
     }
 }
 
-fn render_timeline(frame: &mut Frame, state: &AppState) {
+fn render_tabs(frame: &mut Frame, state: &AppState, area: Rect) {
     let colors = state.theme.colors();
-    let area = frame.area();
+
+    let titles: Vec<Line> = vec![
+        format!(
+            "{}  Timeline",
+            if state.view == View::Timeline {
+                "●"
+            } else {
+                "○"
+            }
+        ),
+        format!(
+            "{}  Accounts",
+            if state.view == View::Accounts {
+                "●"
+            } else {
+                "○"
+            }
+        ),
+    ]
+    .into_iter()
+    .map(Line::from)
+    .collect();
+
+    let selected = match state.view {
+        View::Timeline => 0,
+        View::Accounts => 1,
+    };
+
+    let tabs = Tabs::new(titles)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_type(BorderType::Rounded)
+                .border_style(colors.block())
+                .title(format!(" {} Perch ", ICON))
+                .title_style(colors.logo_style_primary()),
+        )
+        .select(selected)
+        .style(colors.tab())
+        .highlight_style(colors.tab_active())
+        .divider(Span::styled(" │ ", colors.text_muted()));
+
+    frame.render_widget(tabs, area);
+}
+
+fn render_main(frame: &mut Frame, state: &AppState, area: Rect) {
+    match state.view {
+        View::Timeline => render_timeline_view(frame, state, area),
+        View::Accounts => render_accounts_view(frame, state, area),
+    }
+}
+
+fn render_timeline_view(frame: &mut Frame, state: &AppState, area: Rect) {
+    let colors = state.theme.colors();
 
     // Layout: [Accounts 20%] [Timeline 40%] [Detail 40%]
-    let main_chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([Constraint::Min(3), Constraint::Length(3)])
-        .split(area);
-
-    let content_area = main_chunks[0];
-    let status_area = main_chunks[1];
-
     let horizontal = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([
@@ -44,11 +122,12 @@ fn render_timeline(frame: &mut Frame, state: &AppState) {
             Constraint::Percentage(40),
             Constraint::Percentage(40),
         ])
-        .split(content_area);
+        .split(area);
 
-    // Accounts panel
+    // Accounts panel (sidebar)
     let accounts_block = Block::default()
         .title(" 👤 Accounts ")
+        .title_style(colors.text_primary())
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
         .border_style(if state.focused_panel == FocusedPanel::Accounts {
@@ -63,28 +142,46 @@ fn render_timeline(frame: &mut Frame, state: &AppState) {
         .enumerate()
         .map(|(i, account)| {
             let icon = account.network.emoji();
-            let content = format!("{} {} ({})", icon, account.display_name, account.handle);
+            let content = format!("{} {}", icon, account.display_name);
             let style = if i == state.selected_account {
                 colors.selected()
             } else {
                 colors.text()
             };
-            ListItem::new(content).style(style)
+            ListItem::new(Line::from(vec![
+                Span::styled(if i == state.selected_account { " ▸ " } else { "   " }, style),
+                Span::styled(content, style),
+            ]))
         })
         .collect();
 
-    let accounts_list = List::new(account_items).block(accounts_block);
-    frame.render_widget(accounts_list, horizontal[0]);
+    if account_items.is_empty() {
+        let empty = Paragraph::new(vec![
+            Line::from(""),
+            Line::styled("  No accounts", colors.text_muted()),
+            Line::from(""),
+            Line::from(vec![
+                Span::styled("  Run ", colors.text_dim()),
+                Span::styled("perch auth", colors.text_primary()),
+            ]),
+        ])
+        .block(accounts_block);
+        frame.render_widget(empty, horizontal[0]);
+    } else {
+        let accounts_list = List::new(account_items).block(accounts_block);
+        frame.render_widget(accounts_list, horizontal[0]);
+    }
 
     // Timeline panel
     let filter_label = match state.timeline_filter {
-        super::state::TimelineFilter::All => "🌐 All",
-        super::state::TimelineFilter::Mastodon => "🐘 Mastodon",
-        super::state::TimelineFilter::Bluesky => "🦋 Bluesky",
+        TimelineFilter::All => "🌐 All",
+        TimelineFilter::Mastodon => "🐘 Mastodon",
+        TimelineFilter::Bluesky => "🦋 Bluesky",
     };
 
     let timeline_block = Block::default()
         .title(format!(" 📰 Timeline ({}) ", filter_label))
+        .title_style(colors.text_primary())
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
         .border_style(if state.focused_panel == FocusedPanel::Timeline {
@@ -95,9 +192,24 @@ fn render_timeline(frame: &mut Frame, state: &AppState) {
 
     // Show loading or empty state
     let post_items: Vec<ListItem> = if state.loading && state.posts.is_empty() {
-        vec![ListItem::new("  Loading...").style(colors.text_muted())]
+        vec![ListItem::new(Line::from(vec![
+            Span::styled("  ", Style::default()),
+            Span::styled("⏳ Loading...", colors.text_muted()),
+        ]))]
     } else if state.posts.is_empty() {
-        vec![ListItem::new("  No posts yet. Press 'r' to refresh.").style(colors.text_muted())]
+        vec![
+            ListItem::new(Line::from("")),
+            ListItem::new(Line::from(vec![
+                Span::styled("  ℹ ", colors.text_info()),
+                Span::styled("No posts yet", colors.text_muted()),
+            ])),
+            ListItem::new(Line::from("")),
+            ListItem::new(Line::from(vec![
+                Span::styled("  Press ", colors.text_dim()),
+                Span::styled("[r]", colors.key_hint()),
+                Span::styled(" to refresh", colors.text_dim()),
+            ])),
+        ]
     } else {
         state
             .posts
@@ -105,24 +217,34 @@ fn render_timeline(frame: &mut Frame, state: &AppState) {
             .enumerate()
             .map(|(i, post)| {
                 let icon = post.network.emoji();
-                let preview = post.preview(50);
+                let preview = post.preview(45);
                 let time = post.relative_time();
-                // Show liked/reposted indicators
-                let indicators = format!(
-                    "{}{}",
-                    if post.liked { "❤️" } else { "" },
-                    if post.reposted { "🔁" } else { "" }
-                );
-                let content = format!(
-                    "{} @{} · {} {}\n  {}",
-                    icon, post.author_handle, time, indicators, preview
-                );
-                let style = if i == state.selected_post {
+                
+                // Status indicators
+                let like_icon = if post.liked { "❤️" } else { "" };
+                let repost_icon = if post.reposted { "🔁" } else { "" };
+                
+                let is_selected = i == state.selected_post;
+                let style = if is_selected {
                     colors.selected()
                 } else {
                     colors.text()
                 };
-                ListItem::new(content).style(style)
+                let cursor = if is_selected { "▸" } else { " " };
+
+                ListItem::new(vec![
+                    Line::from(vec![
+                        Span::styled(format!(" {} ", cursor), style),
+                        Span::styled(format!("{} @{}", icon, post.author_handle), 
+                            if is_selected { style } else { colors.text_primary() }),
+                        Span::styled(format!(" · {}", time), colors.text_muted()),
+                        Span::styled(format!(" {}{}", like_icon, repost_icon), Style::default()),
+                    ]),
+                    Line::from(vec![
+                        Span::styled("    ", style),
+                        Span::styled(preview, style),
+                    ]),
+                ])
             })
             .collect()
     };
@@ -132,7 +254,8 @@ fn render_timeline(frame: &mut Frame, state: &AppState) {
 
     // Detail panel
     let detail_block = Block::default()
-        .title(" 📝 Post ")
+        .title(" 📝 Post Detail ")
+        .title_style(colors.text_primary())
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
         .border_style(if state.focused_panel == FocusedPanel::Detail {
@@ -141,162 +264,138 @@ fn render_timeline(frame: &mut Frame, state: &AppState) {
             colors.block()
         });
 
-    let detail_content = if let Some(post) = state.selected_post() {
-        let header = format!(
-            "{} {} (@{})\n{}\n\n",
-            post.network.emoji(),
-            post.author_name,
-            post.author_handle,
-            post.relative_time()
-        );
-        // Show status icons for liked/reposted
+    if let Some(post) = state.selected_post() {
         let like_icon = if post.liked { "❤️" } else { "♡" };
         let repost_icon = if post.reposted { "🔁" } else { "↻" };
-        let stats = format!(
-            "\n\n{} {}  {} {}  💬 {}",
-            like_icon, post.like_count,
-            repost_icon, post.repost_count,
-            post.reply_count
-        );
-        format!("{}{}{}", header, post.content, stats)
+        
+        let detail_content = vec![
+            Line::from(""),
+            Line::from(vec![
+                Span::styled("  ", Style::default()),
+                Span::styled(post.network.emoji(), Style::default()),
+                Span::styled(format!(" {} ", post.author_name), colors.text_primary().add_modifier(Modifier::BOLD)),
+                Span::styled(format!("@{}", post.author_handle), colors.text_muted()),
+            ]),
+            Line::from(vec![
+                Span::styled(format!("     {}", post.relative_time()), colors.text_muted()),
+            ]),
+            Line::from(""),
+            // Content lines
+            Line::from(vec![
+                Span::styled("  ", Style::default()),
+                Span::styled(&post.content, colors.text()),
+            ]),
+            Line::from(""),
+            Line::from("  ─────────────────────────────────"),
+            Line::from(""),
+            Line::from(vec![
+                Span::styled("  ", Style::default()),
+                Span::styled(format!("{} {}", like_icon, post.like_count), 
+                    if post.liked { colors.text_error() } else { colors.text_muted() }),
+                Span::styled("   ", Style::default()),
+                Span::styled(format!("{} {}", repost_icon, post.repost_count),
+                    if post.reposted { colors.text_success() } else { colors.text_muted() }),
+                Span::styled("   ", Style::default()),
+                Span::styled(format!("💬 {}", post.reply_count), colors.text_muted()),
+            ]),
+        ];
+
+        let detail = Paragraph::new(detail_content)
+            .block(detail_block)
+            .wrap(Wrap { trim: false });
+        frame.render_widget(detail, horizontal[2]);
     } else {
-        "No post selected".to_string()
-    };
-
-    let detail = Paragraph::new(detail_content)
-        .block(detail_block)
-        .wrap(Wrap { trim: false })
-        .style(colors.text());
-    frame.render_widget(detail, horizontal[2]);
-
-    // Status bar
-    render_status_bar(frame, state, status_area);
+        let empty = Paragraph::new(vec![
+            Line::from(""),
+            Line::from(""),
+            Line::styled("  Select a post", colors.text_muted()),
+        ])
+        .block(detail_block);
+        frame.render_widget(empty, horizontal[2]);
+    }
 }
 
-fn render_compose(frame: &mut Frame, state: &AppState) {
+fn render_accounts_view(frame: &mut Frame, state: &AppState, area: Rect) {
     let colors = state.theme.colors();
-    let area = frame.area();
 
-    // Center the compose box
-    let compose_area = centered_rect(60, 60, area);
+    if state.accounts.is_empty() {
+        let empty = Paragraph::new(vec![
+            Line::from(""),
+            Line::from(""),
+            Line::styled("  No accounts connected", colors.text_muted()),
+            Line::from(""),
+            Line::from(vec![
+                Span::styled("  Run ", colors.text_dim()),
+                Span::styled("perch auth mastodon", colors.text_primary()),
+                Span::styled(" or ", colors.text_dim()),
+                Span::styled("perch auth bluesky", colors.text_primary()),
+            ]),
+            Line::from(vec![
+                Span::styled("  to connect an account", colors.text_dim()),
+            ]),
+        ])
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_type(BorderType::Rounded)
+                .border_style(colors.block())
+                .title(" 👤 Connected Accounts ")
+                .title_style(colors.text_primary()),
+        );
+        frame.render_widget(empty, area);
+        return;
+    }
 
-    let networks_str: String = state
-        .compose_networks
+    let items: Vec<ListItem> = state
+        .accounts
         .iter()
-        .map(|n| n.emoji())
-        .collect::<Vec<_>>()
-        .join(" ");
+        .enumerate()
+        .map(|(i, account)| {
+            let is_selected = i == state.selected_account;
+            let cursor = if is_selected { "▸" } else { " " };
+            let style = if is_selected {
+                colors.selected()
+            } else {
+                colors.text()
+            };
 
-    let compose_block = Block::default()
-        .title(format!(" 📝 Compose → {} ", networks_str))
-        .borders(Borders::ALL)
-        .border_type(BorderType::Rounded)
-        .border_style(colors.block_focus());
+            let network_style = match account.network {
+                crate::models::Network::Mastodon => colors.network_mastodon(),
+                crate::models::Network::Bluesky => colors.network_bluesky(),
+            };
 
-    let char_count = state.compose_text.len();
-    let text = format!(
-        "{}\n\n─────────────────────────────────\n{} characters | Ctrl+Enter to post | Esc to cancel\nAlt+1: 🐘 Mastodon | Alt+2: 🦋 Bluesky",
-        if state.compose_text.is_empty() {
-            "What's on your mind?"
-        } else {
-            &state.compose_text
-        },
-        char_count
+            ListItem::new(vec![
+                Line::from(vec![
+                    Span::styled(format!(" {} ", cursor), style),
+                    Span::styled(account.network.emoji(), network_style),
+                    Span::styled(format!(" {} ", account.display_name), style.add_modifier(Modifier::BOLD)),
+                ]),
+                Line::from(vec![
+                    Span::styled("     ", style),
+                    Span::styled(format!("@{}", account.handle), colors.text_muted()),
+                ]),
+                Line::from(vec![
+                    Span::styled("     ", style),
+                    Span::styled(
+                        format!("Server: {}", account.server),
+                        colors.text_dim(),
+                    ),
+                ]),
+                Line::from(""),
+            ])
+        })
+        .collect();
+
+    let list = List::new(items).block(
+        Block::default()
+            .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
+            .border_style(colors.block_focus())
+            .title(format!(" 👤 Connected Accounts ({}) ", state.accounts.len()))
+            .title_style(colors.text_primary()),
     );
 
-    let compose = Paragraph::new(text)
-        .block(compose_block)
-        .wrap(Wrap { trim: false })
-        .style(if state.compose_text.is_empty() {
-            colors.text_muted()
-        } else {
-            colors.text()
-        });
-
-    // Clear area first
-    frame.render_widget(Block::default().style(Style::default().bg(colors.bg)), compose_area);
-    frame.render_widget(compose, compose_area);
-}
-
-fn render_search(frame: &mut Frame, state: &AppState) {
-    let colors = state.theme.colors();
-    let area = frame.area();
-
-    let search_area = centered_rect(60, 20, area);
-
-    let search_block = Block::default()
-        .title(" 🔍 Search ")
-        .borders(Borders::ALL)
-        .border_type(BorderType::Rounded)
-        .border_style(colors.block_focus());
-
-    let text = format!(
-        "{}\n\nEnter to search | Esc to cancel",
-        if state.search_query.is_empty() {
-            "Type to search..."
-        } else {
-            &state.search_query
-        }
-    );
-
-    let search = Paragraph::new(text)
-        .block(search_block)
-        .style(colors.text());
-
-    frame.render_widget(Block::default().style(Style::default().bg(colors.bg)), search_area);
-    frame.render_widget(search, search_area);
-}
-
-fn render_help(frame: &mut Frame, state: &AppState) {
-    let colors = state.theme.colors();
-    let area = frame.area();
-
-    let help_area = centered_rect(70, 80, area);
-
-    let help_block = Block::default()
-        .title(" ❓ Help ")
-        .borders(Borders::ALL)
-        .border_type(BorderType::Rounded)
-        .border_style(colors.block_focus());
-
-    let help_text = r#"
-  NAVIGATION
-    j/↓         Move down
-    k/↑         Move up
-    Tab         Switch panel
-    g           Jump to top
-    G           Jump to bottom
-
-  ACTIONS
-    n           New post (compose)
-    /           Search
-    r           Refresh timeline
-    o           Open in browser
-    l           Like/favorite
-    b           Boost/repost
-
-  VIEW
-    f           Cycle filter (All/Mastodon/Bluesky)
-    t           Change theme
-    ?           Toggle help
-
-  COMPOSE
-    Ctrl+Enter  Post
-    Alt+1       Toggle Mastodon
-    Alt+2       Toggle Bluesky
-    Esc         Cancel
-
-  GENERAL
-    q           Quit
-    Esc         Close dialog / Clear status
-"#;
-
-    let help = Paragraph::new(help_text)
-        .block(help_block)
-        .style(colors.text());
-
-    frame.render_widget(Block::default().style(Style::default().bg(colors.bg)), help_area);
-    frame.render_widget(help, help_area);
+    frame.render_widget(list, area);
 }
 
 fn render_status_bar(frame: &mut Frame, state: &AppState, area: Rect) {
@@ -312,40 +411,426 @@ fn render_status_bar(frame: &mut Frame, state: &AppState, area: Rect) {
         String::new()
     };
 
-    let status_text = if state.status.is_empty() {
-        format!(
-            " {}🐦 Perch | {} | {} posts | ? for help | q to quit",
-            loading_indicator,
-            state.theme.name(),
-            state.posts.len()
-        )
+    let content = if !state.status.is_empty() {
+        vec![
+            Span::styled(" ", Style::default()),
+            Span::styled(&loading_indicator, colors.text_secondary()),
+            Span::styled(&state.status, colors.text_secondary()),
+        ]
     } else {
-        format!(" {}{} ", loading_indicator, state.status)
+        vec![
+            Span::styled(" ", Style::default()),
+            Span::styled(&loading_indicator, colors.text_secondary()),
+            Span::styled("Tab", colors.key_hint()),
+            Span::styled(": views  ", colors.text_muted()),
+            Span::styled("?", colors.key_hint()),
+            Span::styled(": help  ", colors.text_muted()),
+            Span::styled("t", colors.key_hint()),
+            Span::styled(": theme  ", colors.text_muted()),
+            Span::styled("A", colors.key_hint()),
+            Span::styled(": about  ", colors.text_muted()),
+            Span::styled("q", colors.key_hint()),
+            Span::styled(": quit", colors.text_muted()),
+        ]
     };
 
-    let status = Paragraph::new(status_text)
-        .style(Style::default().fg(colors.fg_muted).bg(colors.bg_secondary));
-
+    let status = Paragraph::new(Line::from(content))
+        .style(Style::default().bg(colors.bg_secondary));
     frame.render_widget(status, area);
 }
 
-/// Helper function to create a centered rect
-fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
-    let popup_layout = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Percentage((100 - percent_y) / 2),
-            Constraint::Percentage(percent_y),
-            Constraint::Percentage((100 - percent_y) / 2),
-        ])
-        .split(r);
+fn render_help_popup(frame: &mut Frame, state: &AppState) {
+    let colors = state.theme.colors();
+    let area = frame.area();
 
-    Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([
-            Constraint::Percentage((100 - percent_x) / 2),
-            Constraint::Percentage(percent_x),
-            Constraint::Percentage((100 - percent_x) / 2),
-        ])
-        .split(popup_layout[1])[1]
+    // Calculate popup size
+    let popup_width = 60u16.min(area.width.saturating_sub(4));
+    let popup_height = 28u16.min(area.height.saturating_sub(4));
+
+    let popup_area = centered_rect(popup_width, popup_height, area);
+
+    // Clear the area
+    frame.render_widget(Clear, popup_area);
+
+    let help_content = vec![
+        Line::from(""),
+        Line::from(vec![Span::styled(
+            "  Navigation",
+            colors.text_primary().add_modifier(Modifier::BOLD),
+        )]),
+        Line::from(vec![
+            Span::styled("  Tab              ", colors.key_hint()),
+            Span::styled("Switch between views", colors.text()),
+        ]),
+        Line::from(vec![
+            Span::styled("  h/l or ←/→       ", colors.key_hint()),
+            Span::styled("Switch panels", colors.text()),
+        ]),
+        Line::from(vec![
+            Span::styled("  j/k or ↑/↓       ", colors.key_hint()),
+            Span::styled("Navigate items", colors.text()),
+        ]),
+        Line::from(vec![
+            Span::styled("  g/G              ", colors.key_hint()),
+            Span::styled("Go to first/last item", colors.text()),
+        ]),
+        Line::from(""),
+        Line::from(vec![Span::styled(
+            "  Timeline View",
+            colors.text_primary().add_modifier(Modifier::BOLD),
+        )]),
+        Line::from(vec![
+            Span::styled("  n                ", colors.key_hint()),
+            Span::styled("Compose new post", colors.text()),
+        ]),
+        Line::from(vec![
+            Span::styled("  r                ", colors.key_hint()),
+            Span::styled("Refresh timeline", colors.text()),
+        ]),
+        Line::from(vec![
+            Span::styled("  L                ", colors.key_hint()),
+            Span::styled("Like/unlike post", colors.text()),
+        ]),
+        Line::from(vec![
+            Span::styled("  b                ", colors.key_hint()),
+            Span::styled("Boost/repost", colors.text()),
+        ]),
+        Line::from(vec![
+            Span::styled("  o                ", colors.key_hint()),
+            Span::styled("Open in browser", colors.text()),
+        ]),
+        Line::from(vec![
+            Span::styled("  f                ", colors.key_hint()),
+            Span::styled("Cycle filter (All/Mastodon/Bluesky)", colors.text()),
+        ]),
+        Line::from(vec![
+            Span::styled("  /                ", colors.key_hint()),
+            Span::styled("Search posts", colors.text()),
+        ]),
+        Line::from(""),
+        Line::from(vec![Span::styled(
+            "  General",
+            colors.text_primary().add_modifier(Modifier::BOLD),
+        )]),
+        Line::from(vec![
+            Span::styled("  t                ", colors.key_hint()),
+            Span::styled("Open theme selector", colors.text()),
+        ]),
+        Line::from(vec![
+            Span::styled("  A                ", colors.key_hint()),
+            Span::styled("About Perch", colors.text()),
+        ]),
+        Line::from(vec![
+            Span::styled("  ?                ", colors.key_hint()),
+            Span::styled("Toggle this help", colors.text()),
+        ]),
+        Line::from(vec![
+            Span::styled("  q                ", colors.key_hint()),
+            Span::styled("Quit application", colors.text()),
+        ]),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("  Press ", colors.text_muted()),
+            Span::styled("Esc", colors.key_hint()),
+            Span::styled(" or ", colors.text_muted()),
+            Span::styled("?", colors.key_hint()),
+            Span::styled(" to close", colors.text_muted()),
+        ]),
+    ];
+
+    let help = Paragraph::new(help_content)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_type(BorderType::Rounded)
+                .border_style(colors.block_focus())
+                .style(Style::default().bg(colors.bg_secondary))
+                .title(" ⌨ Keyboard Shortcuts ")
+                .title_style(colors.text_primary()),
+        )
+        .wrap(Wrap { trim: false });
+
+    frame.render_widget(help, popup_area);
+}
+
+fn render_theme_picker(frame: &mut Frame, state: &AppState) {
+    let colors = state.theme.colors();
+    let area = frame.area();
+
+    let popup_area = centered_rect(50, 70, area);
+    frame.render_widget(Clear, popup_area);
+
+    let themes = Theme::all();
+    let items: Vec<ListItem> = themes
+        .iter()
+        .enumerate()
+        .map(|(i, theme_name)| {
+            let palette = theme_name.palette();
+            let selected = i == state.theme_picker_index;
+
+            // Create color preview squares
+            let preview = format!(
+                "  {} {} ",
+                if selected { "▸" } else { " " },
+                theme_name.display_name()
+            );
+
+            let style = if selected {
+                Style::default()
+                    .fg(palette.accent)
+                    .bg(palette.selection)
+                    .add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().fg(palette.fg)
+            };
+
+            ListItem::new(Line::from(vec![
+                Span::styled(preview, style),
+                Span::styled("█", Style::default().fg(palette.accent)),
+                Span::styled("█", Style::default().fg(palette.secondary)),
+                Span::styled("█", Style::default().fg(palette.success)),
+                Span::styled("█", Style::default().fg(palette.warning)),
+            ]))
+        })
+        .collect();
+
+    let theme_list = List::new(items).block(
+        Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(colors.primary))
+            .border_type(BorderType::Rounded)
+            .style(Style::default().bg(colors.bg))
+            .title(format!(
+                " 🎨 Select Theme ({}/{}) ",
+                state.theme_picker_index + 1,
+                themes.len()
+            ))
+            .title_bottom(Line::from(" ↑↓ navigate │ ↵ apply │ Esc cancel ").centered()),
+    );
+
+    frame.render_widget(theme_list, popup_area);
+}
+
+fn render_about_dialog(frame: &mut Frame, state: &AppState) {
+    let colors = state.theme.colors();
+    let area = frame.area();
+
+    let popup_area = centered_rect(70, 55, area);
+    frame.render_widget(Clear, popup_area);
+
+    let version = env!("CARGO_PKG_VERSION");
+    let repo = "https://github.com/ricardodantas/perch";
+
+    let logo_lines: Vec<Line> = LOGO
+        .lines()
+        .filter(|line| !line.is_empty())
+        .enumerate()
+        .map(|(i, line)| {
+            let style = if i % 2 == 0 {
+                colors.logo_style_primary()
+            } else {
+                colors.logo_style_secondary()
+            };
+            Line::styled(line, style)
+        })
+        .collect();
+
+    let mut lines = logo_lines;
+    lines.extend([
+        Line::from(""),
+        Line::from(Span::styled(
+            "🐦 Terminal social client for Mastodon & Bluesky",
+            Style::default()
+                .fg(colors.fg)
+                .add_modifier(Modifier::ITALIC),
+        )),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("Version: ", colors.text_muted()),
+            Span::styled(
+                version,
+                Style::default()
+                    .fg(colors.primary)
+                    .add_modifier(Modifier::BOLD),
+            ),
+        ]),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("Author: ", colors.text_muted()),
+            Span::styled("Ricardo Dantas", colors.text()),
+        ]),
+        Line::from(vec![
+            Span::styled("License: ", colors.text_muted()),
+            Span::styled("MIT", colors.text()),
+        ]),
+        Line::from(vec![
+            Span::styled("Repo: ", colors.text_muted()),
+            Span::styled(repo, Style::default().fg(colors.primary)),
+        ]),
+        Line::from(""),
+        Line::from(Span::styled(
+            "Built with Rust 🦀 + Ratatui",
+            colors.text_muted().add_modifier(Modifier::ITALIC),
+        )),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled(
+                " [G] ",
+                Style::default()
+                    .fg(colors.primary)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::raw("Open GitHub"),
+            Span::raw("    "),
+            Span::styled(" [Esc] ", colors.text_muted()),
+            Span::raw("Close"),
+        ]),
+    ]);
+
+    let paragraph = Paragraph::new(lines).alignment(Alignment::Center).block(
+        Block::default()
+            .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
+            .border_style(Style::default().fg(colors.primary))
+            .style(Style::default().bg(colors.bg))
+            .title(" 🐦 About Perch ")
+            .title_style(
+                Style::default()
+                    .fg(colors.primary)
+                    .add_modifier(Modifier::BOLD),
+            ),
+    );
+
+    frame.render_widget(paragraph, popup_area);
+}
+
+fn render_compose_popup(frame: &mut Frame, state: &AppState) {
+    let colors = state.theme.colors();
+    let area = frame.area();
+
+    let popup_area = centered_rect(60, 50, area);
+    frame.render_widget(Clear, popup_area);
+
+    let networks_str: String = state
+        .compose_networks
+        .iter()
+        .map(|n| n.emoji())
+        .collect::<Vec<_>>()
+        .join(" ");
+
+    let char_count = state.compose_text.len();
+    
+    let content = vec![
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("  ", Style::default()),
+            Span::styled(
+                if state.compose_text.is_empty() {
+                    "What's on your mind?"
+                } else {
+                    &state.compose_text
+                },
+                if state.compose_text.is_empty() {
+                    colors.text_muted()
+                } else {
+                    colors.text()
+                },
+            ),
+        ]),
+        Line::from(""),
+        Line::from("  ─────────────────────────────────────────"),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled(format!("  {} characters", char_count), colors.text_dim()),
+        ]),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("  ", Style::default()),
+            Span::styled("Ctrl+Enter", colors.key_hint()),
+            Span::styled(" post  ", colors.text_muted()),
+            Span::styled("Esc", colors.key_hint()),
+            Span::styled(" cancel", colors.text_muted()),
+        ]),
+        Line::from(vec![
+            Span::styled("  ", Style::default()),
+            Span::styled("Alt+1", colors.key_hint()),
+            Span::styled(" 🐘 Mastodon  ", colors.text_muted()),
+            Span::styled("Alt+2", colors.key_hint()),
+            Span::styled(" 🦋 Bluesky", colors.text_muted()),
+        ]),
+    ];
+
+    let compose = Paragraph::new(content)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_type(BorderType::Rounded)
+                .border_style(colors.block_focus())
+                .style(Style::default().bg(colors.bg))
+                .title(format!(" 📝 Compose → {} ", networks_str))
+                .title_style(colors.text_primary()),
+        )
+        .wrap(Wrap { trim: false });
+
+    frame.render_widget(compose, popup_area);
+}
+
+fn render_search_popup(frame: &mut Frame, state: &AppState) {
+    let colors = state.theme.colors();
+    let area = frame.area();
+
+    let popup_area = centered_rect(50, 20, area);
+    frame.render_widget(Clear, popup_area);
+
+    let content = vec![
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("  ", Style::default()),
+            Span::styled(
+                if state.search_query.is_empty() {
+                    "Type to search..."
+                } else {
+                    &state.search_query
+                },
+                if state.search_query.is_empty() {
+                    colors.text_muted()
+                } else {
+                    colors.text()
+                },
+            ),
+        ]),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("  ", Style::default()),
+            Span::styled("Enter", colors.key_hint()),
+            Span::styled(" search  ", colors.text_muted()),
+            Span::styled("Esc", colors.key_hint()),
+            Span::styled(" cancel", colors.text_muted()),
+        ]),
+    ];
+
+    let search = Paragraph::new(content)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_type(BorderType::Rounded)
+                .border_style(colors.block_focus())
+                .style(Style::default().bg(colors.bg))
+                .title(" 🔍 Search ")
+                .title_style(colors.text_primary()),
+        );
+
+    frame.render_widget(search, popup_area);
+}
+
+/// Helper function to create a centered rect
+fn centered_rect(width: u16, height: u16, r: Rect) -> Rect {
+    let popup_width = width.min(r.width.saturating_sub(2));
+    let popup_height = height.min(r.height.saturating_sub(2));
+    Rect {
+        x: r.x + (r.width.saturating_sub(popup_width)) / 2,
+        y: r.y + (r.height.saturating_sub(popup_height)) / 2,
+        width: popup_width,
+        height: popup_height,
+    }
 }

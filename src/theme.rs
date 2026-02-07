@@ -122,6 +122,12 @@ pub struct ThemeColors {
     pub mastodon: Color,
     /// Bluesky brand color (blue)
     pub bluesky: Color,
+
+    // Logo colors
+    /// Logo primary color
+    pub logo_primary: Color,
+    /// Logo secondary color
+    pub logo_secondary: Color,
 }
 
 impl ThemeColors {
@@ -155,6 +161,10 @@ impl ThemeColors {
             // Network colors (approximate)
             mastodon: Color::Rgb(99, 100, 255),  // #6364FF
             bluesky: Color::Rgb(0, 133, 255),    // #0085FF
+
+            // Logo colors
+            logo_primary: p.accent,
+            logo_secondary: p.secondary,
         }
     }
 
@@ -283,5 +293,21 @@ impl ThemeColors {
     #[must_use]
     pub fn network_bluesky(&self) -> Style {
         Style::default().fg(self.bluesky)
+    }
+
+    /// Logo primary style
+    #[must_use]
+    pub fn logo_style_primary(&self) -> Style {
+        Style::default()
+            .fg(self.logo_primary)
+            .add_modifier(Modifier::BOLD)
+    }
+
+    /// Logo secondary style
+    #[must_use]
+    pub fn logo_style_secondary(&self) -> Style {
+        Style::default()
+            .fg(self.logo_secondary)
+            .add_modifier(Modifier::BOLD)
     }
 }

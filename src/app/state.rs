@@ -10,13 +10,17 @@ use crate::theme::Theme;
 /// Which panel is currently focused
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum FocusedPanel {
+    /// Accounts sidebar panel
     #[default]
     Accounts,
+    /// Timeline posts list panel
     Timeline,
+    /// Post detail panel
     Detail,
 }
 
 impl FocusedPanel {
+    /// Get the next panel in tab order
     pub fn next(&self) -> Self {
         match self {
             Self::Accounts => Self::Timeline,
@@ -25,6 +29,7 @@ impl FocusedPanel {
         }
     }
 
+    /// Get the previous panel in tab order
     pub fn prev(&self) -> Self {
         match self {
             Self::Accounts => Self::Detail,
@@ -34,14 +39,30 @@ impl FocusedPanel {
     }
 }
 
-/// Current view mode
+/// Current view/tab
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum View {
     #[default]
     Timeline,
+    Accounts,
+}
+
+/// Modal mode for dialogs
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Mode {
+    /// Normal navigation mode
+    #[default]
+    Normal,
+    /// Compose new post
     Compose,
+    /// Search posts
     Search,
+    /// Help dialog
     Help,
+    /// Theme picker dialog
+    ThemePicker,
+    /// About dialog
+    About,
 }
 
 /// Timeline filter
@@ -89,8 +110,10 @@ pub struct AppState {
     pub should_quit: bool,
     /// Current theme
     pub theme: Theme,
-    /// Current view
+    /// Current view/tab
     pub view: View,
+    /// Current modal mode
+    pub mode: Mode,
     /// Focused panel
     pub focused_panel: FocusedPanel,
     /// Timeline filter
@@ -125,6 +148,9 @@ pub struct AppState {
 
     /// Tick counter for animations
     tick: u64,
+
+    /// Theme picker index
+    pub theme_picker_index: usize,
 }
 
 impl AppState {
@@ -134,12 +160,19 @@ impl AppState {
         let accounts = db.get_accounts()?;
         let posts = db.get_cached_posts(None, config.post_limit)?;
 
+        // Find current theme index
+        let theme_picker_index = Theme::all()
+            .iter()
+            .position(|t| *t == theme.inner())
+            .unwrap_or(0);
+
         Ok(Self {
             config,
             db,
             should_quit: false,
             theme,
             view: View::Timeline,
+            mode: Mode::Normal,
             focused_panel: FocusedPanel::Timeline,
             timeline_filter: TimelineFilter::All,
             accounts,
@@ -154,6 +187,7 @@ impl AppState {
             status: String::new(),
             loading: false,
             tick: 0,
+            theme_picker_index,
         })
     }
 
@@ -242,13 +276,13 @@ impl AppState {
 
     /// Open compose view
     pub fn open_compose(&mut self) {
-        self.view = View::Compose;
+        self.mode = Mode::Compose;
         self.compose_text.clear();
     }
 
     /// Close compose view
     pub fn close_compose(&mut self) {
-        self.view = View::Timeline;
+        self.mode = Mode::Normal;
     }
 
     /// Toggle network in compose
@@ -258,5 +292,21 @@ impl AppState {
         } else {
             self.compose_networks.push(network);
         }
+    }
+
+    /// Navigate to the next view
+    pub fn next_view(&mut self) {
+        self.view = match self.view {
+            View::Timeline => View::Accounts,
+            View::Accounts => View::Timeline,
+        };
+    }
+
+    /// Navigate to the previous view
+    pub fn prev_view(&mut self) {
+        self.view = match self.view {
+            View::Timeline => View::Accounts,
+            View::Accounts => View::Timeline,
+        };
     }
 }

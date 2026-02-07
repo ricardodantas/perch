@@ -3,25 +3,76 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use super::async_ops::AsyncCommand;
-use super::state::{AppState, FocusedPanel, View};
+use super::state::{AppState, FocusedPanel, Mode, View};
 use crate::models::Network;
+use crate::theme::Theme;
 
 /// Handle key events, returning an optional async command
 pub fn handle_key(state: &mut AppState, key: KeyEvent) -> Option<AsyncCommand> {
-    // Global shortcuts (work in any view)
+    // Handle mode-specific input first
+    match state.mode {
+        Mode::ThemePicker => {
+            handle_theme_picker_key(state, key);
+            return None;
+        }
+        Mode::Help => {
+            if matches!(key.code, KeyCode::Esc | KeyCode::Char('?') | KeyCode::Enter) {
+                state.mode = Mode::Normal;
+            }
+            return None;
+        }
+        Mode::About => {
+            handle_about_key(state, key);
+            return None;
+        }
+        Mode::Compose => {
+            return handle_compose_key(state, key);
+        }
+        Mode::Search => {
+            return handle_search_key(state, key);
+        }
+        Mode::Normal => {}
+    }
+
+    // Global shortcuts (work in normal mode)
     match (key.modifiers, key.code) {
         (KeyModifiers::CONTROL, KeyCode::Char('c')) | (_, KeyCode::Char('q')) => {
-            if state.view == View::Timeline {
-                state.should_quit = true;
-                return None;
-            }
+            state.should_quit = true;
+            return None;
         }
-        (_, KeyCode::Char('?')) => {
-            state.view = if state.view == View::Help {
-                View::Timeline
-            } else {
-                View::Help
-            };
+        (_, KeyCode::Char('?')) | (_, KeyCode::F(1)) => {
+            state.mode = Mode::Help;
+            return None;
+        }
+        (_, KeyCode::Tab) => {
+            state.next_view();
+            return None;
+        }
+        (KeyModifiers::SHIFT, KeyCode::BackTab) => {
+            state.prev_view();
+            return None;
+        }
+        // Number keys for quick navigation
+        (_, KeyCode::Char('1')) => {
+            state.view = View::Timeline;
+            return None;
+        }
+        (_, KeyCode::Char('2')) => {
+            state.view = View::Accounts;
+            return None;
+        }
+        // Theme picker
+        (_, KeyCode::Char('t')) => {
+            state.theme_picker_index = Theme::all()
+                .iter()
+                .position(|t| *t == state.theme.inner())
+                .unwrap_or(0);
+            state.mode = Mode::ThemePicker;
+            return None;
+        }
+        // About dialog
+        (KeyModifiers::SHIFT, KeyCode::Char('A')) => {
+            state.mode = Mode::About;
             return None;
         }
         _ => {}
@@ -30,31 +81,23 @@ pub fn handle_key(state: &mut AppState, key: KeyEvent) -> Option<AsyncCommand> {
     // View-specific handling
     match state.view {
         View::Timeline => handle_timeline_key(state, key),
-        View::Compose => handle_compose_key(state, key),
-        View::Search => handle_search_key(state, key),
-        View::Help => handle_help_key(state, key),
+        View::Accounts => handle_accounts_key(state, key),
     }
 }
 
 fn handle_timeline_key(state: &mut AppState, key: KeyEvent) -> Option<AsyncCommand> {
     match (key.modifiers, key.code) {
-        // Quit
-        (_, KeyCode::Char('q')) => {
-            state.should_quit = true;
-            None
-        }
-
-        // Navigation
-        (_, KeyCode::Tab) => {
-            state.focused_panel = state.focused_panel.next();
-            None
-        }
-        (KeyModifiers::SHIFT, KeyCode::BackTab) => {
+        // Panel navigation (when in timeline view)
+        (_, KeyCode::Left) | (_, KeyCode::Char('h')) => {
             state.focused_panel = state.focused_panel.prev();
             None
         }
+        (_, KeyCode::Right) | (_, KeyCode::Char('l')) => {
+            state.focused_panel = state.focused_panel.next();
+            None
+        }
 
-        // Panel-specific navigation
+        // Navigation within panel
         (_, KeyCode::Char('j') | KeyCode::Down) => {
             match state.focused_panel {
                 FocusedPanel::Accounts => state.select_next_account(),
@@ -88,7 +131,7 @@ fn handle_timeline_key(state: &mut AppState, key: KeyEvent) -> Option<AsyncComma
             None
         }
         (_, KeyCode::Char('/')) => {
-            state.view = View::Search;
+            state.mode = Mode::Search;
             None
         }
         (_, KeyCode::Char('r')) => {
@@ -107,12 +150,12 @@ fn handle_timeline_key(state: &mut AppState, key: KeyEvent) -> Option<AsyncComma
             if let Some(post) = state.selected_post() {
                 if let Some(url) = &post.url {
                     let _ = open::that(url);
-                    state.set_status("Opened in browser");
+                    state.set_status("✓ Opened in browser");
                 }
             }
             None
         }
-        (_, KeyCode::Char('l')) => {
+        (KeyModifiers::NONE, KeyCode::Char('L')) | (KeyModifiers::SHIFT, KeyCode::Char('L')) => {
             // Like/favorite
             if let Some(post) = state.selected_post().cloned() {
                 if let Some(account) = find_account_for_post(state, &post) {
@@ -124,7 +167,7 @@ fn handle_timeline_key(state: &mut AppState, key: KeyEvent) -> Option<AsyncComma
                         return Some(AsyncCommand::Like { post, account });
                     }
                 } else {
-                    state.set_status("No matching account for this network");
+                    state.set_status("⚠ No matching account for this network");
                 }
             }
             None
@@ -136,7 +179,7 @@ fn handle_timeline_key(state: &mut AppState, key: KeyEvent) -> Option<AsyncComma
                     state.set_status("Reposting...");
                     return Some(AsyncCommand::Repost { post, account });
                 } else {
-                    state.set_status("No matching account for this network");
+                    state.set_status("⚠ No matching account for this network");
                 }
             }
             None
@@ -149,22 +192,9 @@ fn handle_timeline_key(state: &mut AppState, key: KeyEvent) -> Option<AsyncComma
             None
         }
 
-        // Theme
-        (_, KeyCode::Char('t')) => {
-            state.next_theme();
-            state.set_status(format!("Theme: {}", state.theme.name()));
-            None
-        }
-
         // Enter detail view
         (_, KeyCode::Enter) if state.focused_panel == FocusedPanel::Timeline => {
             state.focused_panel = FocusedPanel::Detail;
-            None
-        }
-
-        // Back from detail
-        (_, KeyCode::Char('h') | KeyCode::Left) if state.focused_panel == FocusedPanel::Detail => {
-            state.focused_panel = FocusedPanel::Timeline;
             None
         }
 
@@ -173,6 +203,34 @@ fn handle_timeline_key(state: &mut AppState, key: KeyEvent) -> Option<AsyncComma
             None
         }
 
+        _ => None,
+    }
+}
+
+fn handle_accounts_key(state: &mut AppState, key: KeyEvent) -> Option<AsyncCommand> {
+    match key.code {
+        KeyCode::Down | KeyCode::Char('j') => {
+            state.select_next_account();
+            None
+        }
+        KeyCode::Up | KeyCode::Char('k') => {
+            state.select_prev_account();
+            None
+        }
+        KeyCode::Char('g') => {
+            state.selected_account = 0;
+            None
+        }
+        KeyCode::Char('G') if key.modifiers == KeyModifiers::SHIFT => {
+            if !state.accounts.is_empty() {
+                state.selected_account = state.accounts.len() - 1;
+            }
+            None
+        }
+        KeyCode::Esc => {
+            state.clear_status();
+            None
+        }
         _ => None,
     }
 }
@@ -196,7 +254,7 @@ fn handle_compose_key(state: &mut AppState, key: KeyEvent) -> Option<AsyncComman
                     .collect();
                 
                 if accounts.is_empty() {
-                    state.set_status("No accounts for selected networks");
+                    state.set_status("⚠ No accounts for selected networks");
                     return None;
                 }
                 
@@ -205,9 +263,9 @@ fn handle_compose_key(state: &mut AppState, key: KeyEvent) -> Option<AsyncComman
                 Some(AsyncCommand::Post { content, accounts })
             } else {
                 if state.compose_text.is_empty() {
-                    state.set_status("Write something first!");
+                    state.set_status("⚠ Write something first!");
                 } else {
-                    state.set_status("Select at least one network");
+                    state.set_status("⚠ Select at least one network");
                 }
                 None
             }
@@ -239,7 +297,7 @@ fn handle_compose_key(state: &mut AppState, key: KeyEvent) -> Option<AsyncComman
 fn handle_search_key(state: &mut AppState, key: KeyEvent) -> Option<AsyncCommand> {
     match key.code {
         KeyCode::Esc => {
-            state.view = View::Timeline;
+            state.mode = Mode::Normal;
             state.search_query.clear();
         }
         KeyCode::Enter => {
@@ -258,8 +316,8 @@ fn handle_search_key(state: &mut AppState, key: KeyEvent) -> Option<AsyncCommand
                 let count = filtered.len();
                 state.posts = filtered;
                 state.selected_post = 0;
-                state.view = View::Timeline;
-                state.set_status(format!("Found {} posts matching '{}'", count, state.search_query));
+                state.mode = Mode::Normal;
+                state.set_status(format!("✓ Found {} posts matching '{}'", count, state.search_query));
                 state.search_query.clear();
             }
         }
@@ -274,14 +332,57 @@ fn handle_search_key(state: &mut AppState, key: KeyEvent) -> Option<AsyncCommand
     None
 }
 
-fn handle_help_key(state: &mut AppState, key: KeyEvent) -> Option<AsyncCommand> {
+fn handle_theme_picker_key(state: &mut AppState, key: KeyEvent) {
+    let themes = Theme::all();
+    let len = themes.len();
+
     match key.code {
-        KeyCode::Esc | KeyCode::Char('q') | KeyCode::Char('?') => {
-            state.view = View::Timeline;
+        KeyCode::Esc => {
+            // Cancel - restore original theme
+            state.mode = Mode::Normal;
+        }
+        KeyCode::Enter => {
+            // Apply selected theme
+            let selected_theme = Theme::from(themes[state.theme_picker_index]);
+            state.theme = selected_theme;
+            state.config.theme = selected_theme;
+
+            state.mode = Mode::Normal;
+            state.set_status(format!("✓ Theme set to {}", selected_theme.name()));
+        }
+        KeyCode::Down | KeyCode::Char('j') => {
+            state.theme_picker_index = (state.theme_picker_index + 1) % len;
+            // Preview theme
+            state.theme = Theme::from(themes[state.theme_picker_index]);
+        }
+        KeyCode::Up | KeyCode::Char('k') => {
+            state.theme_picker_index = state.theme_picker_index.checked_sub(1).unwrap_or(len - 1);
+            // Preview theme
+            state.theme = Theme::from(themes[state.theme_picker_index]);
+        }
+        KeyCode::Home | KeyCode::Char('g') => {
+            state.theme_picker_index = 0;
+            state.theme = Theme::from(themes[state.theme_picker_index]);
+        }
+        KeyCode::End | KeyCode::Char('G') => {
+            state.theme_picker_index = len - 1;
+            state.theme = Theme::from(themes[state.theme_picker_index]);
         }
         _ => {}
     }
-    None
+}
+
+fn handle_about_key(state: &mut AppState, key: KeyEvent) {
+    match key.code {
+        KeyCode::Esc | KeyCode::Enter | KeyCode::Char('q') => {
+            state.mode = Mode::Normal;
+        }
+        KeyCode::Char('g') | KeyCode::Char('G') => {
+            // Open GitHub repository
+            let _ = open::that("https://github.com/ricardodantas/perch");
+        }
+        _ => {}
+    }
 }
 
 /// Find an account that matches the network of a post
