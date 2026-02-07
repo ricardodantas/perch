@@ -1,10 +1,6 @@
 //! Authentication module (encrypted file-based credential storage)
 //!
-//! Stores credentials encrypted with AES-256-GCM in the data directory.
-//! - Linux: ~/.local/share/perch/credentials.enc
-//! - macOS: ~/Library/Application Support/perch/credentials.enc
-//! - Windows: C:\Users\<User>\AppData\Roaming\perch\credentials.enc
-//!
+//! Stores credentials encrypted with AES-256-GCM in ~/.config/perch/credentials.enc
 //! The encryption key is derived from machine-specific identifiers.
 
 use aes_gcm::{
@@ -19,17 +15,13 @@ use std::fs;
 use std::path::PathBuf;
 
 use crate::models::Account;
+use crate::paths;
 
-const CREDENTIALS_FILE: &str = "credentials.enc";
 const NONCE_SIZE: usize = 12;
 
 /// Get the credentials file path
 fn credentials_path() -> Result<PathBuf> {
-    let data_dir = dirs::data_dir()
-        .context("Could not find data directory")?
-        .join("perch");
-    fs::create_dir_all(&data_dir)?;
-    Ok(data_dir.join(CREDENTIALS_FILE))
+    paths::credentials_path()
 }
 
 /// Get machine ID for key derivation (cross-platform)

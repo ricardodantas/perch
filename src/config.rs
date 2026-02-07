@@ -4,6 +4,7 @@ use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
+use crate::paths;
 use crate::theme::Theme;
 
 /// Application configuration
@@ -75,10 +76,7 @@ impl Default for Config {
 impl Config {
     /// Get the default config file path
     pub fn default_path() -> Result<PathBuf> {
-        let config_dir = dirs::config_dir()
-            .context("Could not determine config directory")?
-            .join("perch");
-        Ok(config_dir.join("config.toml"))
+        paths::config_path()
     }
 
     /// Load config from the default path or create default

@@ -83,6 +83,7 @@ pub mod config;
 pub mod db;
 pub mod demo;
 pub mod models;
+pub mod paths;
 pub mod sync;
 pub mod theme;
 

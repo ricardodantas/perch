@@ -7,6 +7,7 @@ use std::path::PathBuf;
 use uuid::Uuid;
 
 use crate::models::{Account, Network, Post};
+use crate::paths;
 
 /// Database connection wrapper
 pub struct Database {
@@ -37,10 +38,7 @@ impl Database {
 
     /// Get the default database path
     pub fn default_path() -> Result<PathBuf> {
-        let data_dir = dirs::data_dir()
-            .context("Could not determine data directory")?
-            .join("perch");
-        Ok(data_dir.join("perch.sqlite"))
+        paths::database_path()
     }
 
     /// Initialize the database schema
