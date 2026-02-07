@@ -136,6 +136,8 @@ pub struct AppState {
     pub loading_replies: bool,
     /// Scroll offset for detail panel
     pub detail_scroll: u16,
+    /// Selected reply index (None = main post selected, Some(i) = reply i selected)
+    pub selected_reply: Option<usize>,
 
     /// Compose text buffer
     pub compose_text: String,
@@ -191,6 +193,7 @@ impl AppState {
             current_replies: Vec::new(),
             loading_replies: false,
             detail_scroll: 0,
+            selected_reply: None,
             compose_text: String::new(),
             compose_networks: vec![Network::Mastodon, Network::Bluesky],
             reply_to: None,
@@ -242,6 +245,7 @@ impl AppState {
                 self.current_replies.clear();
                 self.loading_replies = true;
                 self.detail_scroll = 0;
+                self.selected_reply = None;
             }
         }
     }
@@ -254,6 +258,7 @@ impl AppState {
             self.current_replies.clear();
             self.loading_replies = true;
             self.detail_scroll = 0;
+            self.selected_reply = None;
         }
     }
 

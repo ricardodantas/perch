@@ -317,11 +317,19 @@ fn render_timeline_view(frame: &mut Frame, state: &AppState, area: Rect) {
                 Span::styled("  ── Replies ──────────────────────", colors.text_dim()),
             ]));
             
-            for reply in state.current_replies.iter().take(10) {
+            for (idx, reply) in state.current_replies.iter().take(10).enumerate() {
+                let is_selected = state.selected_reply == Some(idx) && state.focused_panel == FocusedPanel::Detail;
+                let prefix = if is_selected { "▶ " } else { "  " };
+                let handle_style = if is_selected {
+                    colors.text_primary().add_modifier(Modifier::BOLD).add_modifier(Modifier::REVERSED)
+                } else {
+                    colors.text_primary()
+                };
+                
                 detail_content.push(Line::from(""));
                 detail_content.push(Line::from(vec![
-                    Span::styled("  ", Style::default()),
-                    Span::styled(format!("@{}", reply.author_handle), colors.text_primary()),
+                    Span::styled(prefix, if is_selected { colors.text_primary() } else { Style::default() }),
+                    Span::styled(format!("@{}", reply.author_handle), handle_style),
                     Span::styled(format!(" · {}", reply.relative_time()), colors.text_muted()),
                 ]));
                 // Show full content

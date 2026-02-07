@@ -105,8 +105,19 @@ fn handle_timeline_key(state: &mut AppState, key: KeyEvent) -> Option<AsyncComma
                     None
                 }
                 FocusedPanel::Detail => {
-                    // Scroll detail panel down
-                    state.detail_scroll = state.detail_scroll.saturating_add(1);
+                    // Navigate through replies (None -> 0 -> 1 -> ... -> max)
+                    if state.current_replies.is_empty() {
+                        // No replies, just scroll
+                        state.detail_scroll = state.detail_scroll.saturating_add(1);
+                    } else {
+                        match state.selected_reply {
+                            None => state.selected_reply = Some(0),
+                            Some(i) if i < state.current_replies.len().saturating_sub(1) => {
+                                state.selected_reply = Some(i + 1);
+                            }
+                            _ => {} // Already at last reply
+                        }
+                    }
                     None
                 }
                 FocusedPanel::Timeline => {
@@ -128,8 +139,17 @@ fn handle_timeline_key(state: &mut AppState, key: KeyEvent) -> Option<AsyncComma
                     None
                 }
                 FocusedPanel::Detail => {
-                    // Scroll detail panel up
-                    state.detail_scroll = state.detail_scroll.saturating_sub(1);
+                    // Navigate through replies (max -> ... -> 1 -> 0 -> None)
+                    if state.current_replies.is_empty() {
+                        // No replies, just scroll
+                        state.detail_scroll = state.detail_scroll.saturating_sub(1);
+                    } else {
+                        match state.selected_reply {
+                            Some(0) => state.selected_reply = None,
+                            Some(i) => state.selected_reply = Some(i - 1),
+                            None => {} // Already at main post
+                        }
+                    }
                     None
                 }
                 FocusedPanel::Timeline => {
@@ -179,8 +199,21 @@ fn handle_timeline_key(state: &mut AppState, key: KeyEvent) -> Option<AsyncComma
             }
         }
         (KeyModifiers::SHIFT, KeyCode::Char('R')) => {
-            // Reply to selected post
-            if let Some(post) = state.selected_post().cloned() {
+            // Reply to selected post or reply
+            let reply_target = if state.focused_panel == FocusedPanel::Detail {
+                // If a reply is selected, reply to that reply
+                if let Some(idx) = state.selected_reply {
+                    state.current_replies.get(idx).cloned()
+                } else {
+                    // Reply to main post
+                    state.selected_post().cloned()
+                }
+            } else {
+                // Reply to main post
+                state.selected_post().cloned()
+            };
+            
+            if let Some(post) = reply_target {
                 state.open_reply(post);
             }
             None
