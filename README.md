@@ -24,7 +24,7 @@
     <img src="https://img.shields.io/badge/license-MIT-89b4fa?style=flat&labelColor=1e1e2e" alt="License">
   </a>
   <a href="https://rust-lang.org">
-    <img src="https://img.shields.io/badge/rust-1.85+-f9e2af?style=flat&labelColor=1e1e2e&logo=rust&logoColor=white" alt="Rust Version">
+    <img src="https://img.shields.io/badge/rust-1.93+-f9e2af?style=flat&labelColor=1e1e2e&logo=rust&logoColor=white" alt="Rust Version">
   </a>
 </p>
 
