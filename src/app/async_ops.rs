@@ -41,14 +41,19 @@ pub enum AsyncResult {
     /// Timeline refreshed with new posts
     TimelineRefreshed { posts: Vec<Post> },
     /// Context/replies fetched for a post
+    #[allow(dead_code)]
     ContextFetched { post_id: String, replies: Vec<ReplyItem> },
     /// Post was liked
+    #[allow(dead_code)]
     Liked { post_id: String },
     /// Post was unliked
+    #[allow(dead_code)]
     Unliked { post_id: String },
     /// Post was reposted
+    #[allow(dead_code)]
     Reposted { post_id: String },
     /// Post was unreposted
+    #[allow(dead_code)]
     Unreposted { post_id: String },
     /// New post created
     Posted { posts: Vec<Post> },

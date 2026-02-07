@@ -10,7 +10,9 @@ use crate::theme::Theme;
 /// A reply with its depth level for display
 #[derive(Debug, Clone)]
 pub struct ReplyItem {
+    /// The post content
     pub post: Post,
+    /// Nesting depth (0 = direct reply, 1+ = nested)
     pub depth: usize,
 }
 

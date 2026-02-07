@@ -328,11 +328,13 @@ impl SocialApi for BlueskyClient {
         }
         
         #[derive(Debug, Deserialize)]
+        #[allow(dead_code)]
         struct LikesResponse {
             likes: Vec<LikeItem>,
         }
         
         #[derive(Debug, Deserialize)]
+        #[allow(dead_code)]
         struct LikeItem {
             actor: ActorRef,
             #[serde(rename = "indexedAt")]
@@ -467,7 +469,7 @@ impl SocialApi for BlueskyClient {
         Ok(())
     }
 
-    async fn unrepost(&self, post: &Post) -> Result<()> {
+    async fn unrepost(&self, _post: &Post) -> Result<()> {
         // For Bluesky, we need to find and delete the repost record
         // This requires knowing the rkey of our repost, which we don't track
         // For now, return an error - full implementation would need to search for the repost

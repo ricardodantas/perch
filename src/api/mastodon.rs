@@ -64,6 +64,7 @@ impl SocialApi for MastodonClient {
             .context("Failed to fetch context")?;
 
         #[derive(Deserialize)]
+        #[allow(dead_code)]
         struct ContextResponse {
             ancestors: Vec<MastodonStatus>,
             descendants: Vec<MastodonStatus>,

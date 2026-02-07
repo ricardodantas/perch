@@ -12,6 +12,7 @@ use super::state::{AppState, FocusedPanel, Mode, TimelineFilter, View};
 use crate::theme::Theme;
 
 /// ASCII art logo for Perch
+#[allow(dead_code)]
 const LOGO: &str = r#"
 ██████╗ ███████╗██████╗  ██████╗██╗  ██╗
 ██╔══██╗██╔════╝██╔══██╗██╔════╝██║  ██║
@@ -395,7 +396,7 @@ fn render_accounts_view(frame: &mut Frame, state: &AppState, area: Rect) {
                 Style::default()
             };
 
-            let network_style = if is_selected {
+            let _network_style = if is_selected {
                 colors.selected().add_modifier(Modifier::BOLD)
             } else {
                 match account.network {
