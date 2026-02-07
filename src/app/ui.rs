@@ -616,27 +616,27 @@ fn render_about_dialog(frame: &mut Frame, state: &AppState) {
     let colors = state.theme.colors();
     let area = frame.area();
 
-    let popup_area = centered_rect(70, 55, area);
+    // Same dimensions as Hazelnut: 80% width, 60% height
+    let popup_area = centered_rect(80, 60, area);
     frame.render_widget(Clear, popup_area);
 
     let version = env!("CARGO_PKG_VERSION");
     let repo = "https://github.com/ricardodantas/perch";
 
-    let logo_lines: Vec<Line> = LOGO
-        .lines()
-        .filter(|line| !line.is_empty())
-        .enumerate()
-        .map(|(i, line)| {
-            let style = if i % 2 == 0 {
-                colors.logo_style_primary()
-            } else {
-                colors.logo_style_secondary()
-            };
-            Line::styled(line, style)
-        })
-        .collect();
+    // Static logo array like Hazelnut - all lines same color
+    let logo = [
+        "██████╗ ███████╗██████╗  ██████╗██╗  ██╗",
+        "██╔══██╗██╔════╝██╔══██╗██╔════╝██║  ██║",
+        "██████╔╝█████╗  ██████╔╝██║     ███████║",
+        "██╔═══╝ ██╔══╝  ██╔══██╗██║     ██╔══██║",
+        "██║     ███████╗██║  ██║╚██████╗██║  ██║",
+        "╚═╝     ╚══════╝╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝",
+    ];
 
-    let mut lines = logo_lines;
+    let mut lines: Vec<Line> = logo
+        .iter()
+        .map(|line| Line::from(Span::styled(*line, Style::default().fg(colors.primary))))
+        .collect();
     lines.extend([
         Line::from(""),
         Line::from(Span::styled(
