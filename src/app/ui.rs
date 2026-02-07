@@ -252,8 +252,15 @@ fn render_timeline_view(frame: &mut Frame, state: &AppState, area: Rect) {
             .collect()
     };
 
-    let timeline_list = List::new(post_items).block(timeline_block);
-    frame.render_widget(timeline_list, horizontal[1]);
+    let timeline_list = List::new(post_items)
+        .block(timeline_block)
+        .highlight_style(colors.selected());
+    
+    // Create a ListState for scrolling
+    let mut list_state = ratatui::widgets::ListState::default();
+    list_state.select(Some(state.selected_post));
+    
+    frame.render_stateful_widget(timeline_list, horizontal[1], &mut list_state);
 
     // Detail panel
     let detail_block = Block::default()
