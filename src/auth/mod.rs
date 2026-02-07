@@ -1,7 +1,11 @@
 //! Authentication module (encrypted file-based credential storage)
 //!
-//! Stores credentials encrypted with AES-256-GCM in ~/.local/share/perch/credentials.enc
-//! The encryption key is derived from a machine-specific identifier.
+//! Stores credentials encrypted with AES-256-GCM in the data directory.
+//! - Linux: ~/.local/share/perch/credentials.enc
+//! - macOS: ~/Library/Application Support/perch/credentials.enc
+//! - Windows: C:\Users\<User>\AppData\Roaming\perch\credentials.enc
+//!
+//! The encryption key is derived from machine-specific identifiers.
 
 use aes_gcm::{
     aead::{Aead, KeyInit},
@@ -28,21 +32,86 @@ fn credentials_path() -> Result<PathBuf> {
     Ok(data_dir.join(CREDENTIALS_FILE))
 }
 
+/// Get machine ID for key derivation (cross-platform)
+fn get_machine_id() -> String {
+    // Try platform-specific machine IDs first
+    
+    // Linux: /etc/machine-id or /var/lib/dbus/machine-id
+    #[cfg(target_os = "linux")]
+    {
+        if let Ok(id) = fs::read_to_string("/etc/machine-id") {
+            return id.trim().to_string();
+        }
+        if let Ok(id) = fs::read_to_string("/var/lib/dbus/machine-id") {
+            return id.trim().to_string();
+        }
+    }
+    
+    // macOS: IOPlatformUUID via ioreg
+    #[cfg(target_os = "macos")]
+    {
+        if let Ok(output) = std::process::Command::new("ioreg")
+            .args(["-rd1", "-c", "IOPlatformExpertDevice"])
+            .output()
+        {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            for line in stdout.lines() {
+                if line.contains("IOPlatformUUID") {
+                    if let Some(uuid) = line.split('"').nth(3) {
+                        return uuid.to_string();
+                    }
+                }
+            }
+        }
+    }
+    
+    // Windows: MachineGuid from registry
+    #[cfg(target_os = "windows")]
+    {
+        if let Ok(output) = std::process::Command::new("reg")
+            .args([
+                "query",
+                r"HKLM\SOFTWARE\Microsoft\Cryptography",
+                "/v",
+                "MachineGuid",
+            ])
+            .output()
+        {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            for line in stdout.lines() {
+                if line.contains("MachineGuid") {
+                    if let Some(guid) = line.split_whitespace().last() {
+                        return guid.to_string();
+                    }
+                }
+            }
+        }
+    }
+    
+    // Fallback: use home directory path (always available via dirs crate)
+    dirs::home_dir()
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_else(|| "perch-fallback-key".to_string())
+}
+
 /// Derive encryption key from machine-specific data
 fn derive_key() -> [u8; 32] {
     let mut hasher = Sha256::new();
     
-    // Use multiple machine-specific identifiers
-    if let Ok(hostname) = hostname::get() {
-        hasher.update(hostname.to_string_lossy().as_bytes());
+    // Primary: machine-specific ID
+    hasher.update(get_machine_id().as_bytes());
+    
+    // Secondary: home directory path (cross-platform via dirs crate)
+    if let Some(home) = dirs::home_dir() {
+        hasher.update(home.to_string_lossy().as_bytes());
     }
     
-    // Add username
-    if let Some(user) = dirs::home_dir() {
-        hasher.update(user.to_string_lossy().as_bytes());
+    // Tertiary: data directory path
+    if let Some(data) = dirs::data_dir() {
+        hasher.update(data.to_string_lossy().as_bytes());
     }
     
-    // Add a fixed salt for this app
+    // Fixed salt for this app
     hasher.update(b"perch-social-client-v1");
     
     hasher.finalize().into()
