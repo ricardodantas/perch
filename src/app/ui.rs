@@ -491,7 +491,7 @@ fn render_help_popup(frame: &mut Frame, state: &AppState) {
         ]),
         Line::from(vec![
             Span::styled("  r                ", colors.key_hint()),
-            Span::styled("Refresh timeline", colors.text()),
+            Span::styled("Repost/boost", colors.text()),
         ]),
         Line::from(vec![
             Span::styled("  L                ", colors.key_hint()),
@@ -499,7 +499,7 @@ fn render_help_popup(frame: &mut Frame, state: &AppState) {
         ]),
         Line::from(vec![
             Span::styled("  b                ", colors.key_hint()),
-            Span::styled("Boost/repost", colors.text()),
+            Span::styled("Refresh timeline", colors.text()),
         ]),
         Line::from(vec![
             Span::styled("  o                ", colors.key_hint()),

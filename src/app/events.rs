@@ -134,8 +134,8 @@ fn handle_timeline_key(state: &mut AppState, key: KeyEvent) -> Option<AsyncComma
             state.mode = Mode::Search;
             None
         }
-        (_, KeyCode::Char('r')) => {
-            // Refresh timeline
+        (_, KeyCode::Char('b')) => {
+            // Refresh timeline (b for "buffer refresh")
             if !state.loading && !state.accounts.is_empty() {
                 state.loading = true;
                 state.set_status("Refreshing...");
@@ -180,8 +180,8 @@ fn handle_timeline_key(state: &mut AppState, key: KeyEvent) -> Option<AsyncComma
             }
             None
         }
-        (_, KeyCode::Char('b')) => {
-            // Boost/repost
+        (_, KeyCode::Char('r')) => {
+            // Repost/boost
             if let Some(post) = state.selected_post().cloned() {
                 if let Some(account) = find_account_for_post(state, &post) {
                     state.set_status("Reposting...");
