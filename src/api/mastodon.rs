@@ -178,7 +178,7 @@ impl SocialApi for MastodonClient {
             display_name: account.display_name,
             handle: account.username,
             server: self.instance.clone(),
-            is_default: false,
+            is_default: true, // First account of this network is default
             avatar_url: Some(account.avatar),
             created_at: Utc::now(),
             last_used_at: None,

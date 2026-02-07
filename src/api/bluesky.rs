@@ -465,7 +465,7 @@ impl SocialApi for BlueskyClient {
             display_name: profile.display_name.unwrap_or_else(|| profile.handle.clone()),
             handle: profile.handle,
             server: self.pds_url.clone(),
-            is_default: false,
+            is_default: true, // First account of this network is default
             avatar_url: profile.avatar,
             created_at: Utc::now(),
             last_used_at: None,
