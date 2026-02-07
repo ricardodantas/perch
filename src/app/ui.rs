@@ -114,63 +114,14 @@ fn render_main(frame: &mut Frame, state: &AppState, area: Rect) {
 fn render_timeline_view(frame: &mut Frame, state: &AppState, area: Rect) {
     let colors = state.theme.colors();
 
-    // Layout: [Accounts 20%] [Timeline 40%] [Detail 40%]
+    // Layout: [Timeline 50%] [Detail 50%]
     let horizontal = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([
-            Constraint::Percentage(20),
-            Constraint::Percentage(40),
-            Constraint::Percentage(40),
+            Constraint::Percentage(50),
+            Constraint::Percentage(50),
         ])
         .split(area);
-
-    // Accounts panel (sidebar)
-    let accounts_block = Block::default()
-        .title(" 👤 Accounts ")
-        .title_style(colors.text_primary())
-        .borders(Borders::ALL)
-        .border_type(BorderType::Rounded)
-        .border_style(if state.focused_panel == FocusedPanel::Accounts {
-            colors.block_focus()
-        } else {
-            colors.block()
-        });
-
-    let account_items: Vec<ListItem> = state
-        .accounts
-        .iter()
-        .enumerate()
-        .map(|(i, account)| {
-            let icon = account.network.emoji();
-            let content = format!("{} {}", icon, account.display_name);
-            let style = if i == state.selected_account {
-                colors.selected()
-            } else {
-                colors.text()
-            };
-            ListItem::new(Line::from(vec![
-                Span::styled(if i == state.selected_account { " ▸ " } else { "   " }, style),
-                Span::styled(content, style),
-            ]))
-        })
-        .collect();
-
-    if account_items.is_empty() {
-        let empty = Paragraph::new(vec![
-            Line::from(""),
-            Line::styled("  No accounts", colors.text_muted()),
-            Line::from(""),
-            Line::from(vec![
-                Span::styled("  Run ", colors.text_dim()),
-                Span::styled("perch auth", colors.text_primary()),
-            ]),
-        ])
-        .block(accounts_block);
-        frame.render_widget(empty, horizontal[0]);
-    } else {
-        let accounts_list = List::new(account_items).block(accounts_block);
-        frame.render_widget(accounts_list, horizontal[0]);
-    }
 
     // Timeline panel
     let filter_label = match state.timeline_filter {
@@ -226,7 +177,7 @@ fn render_timeline_view(frame: &mut Frame, state: &AppState, area: Rect) {
                 if post.reposted { indicators.push_str(" 🔁"); }
                 
                 let is_selected = i == state.selected_post;
-                let width = horizontal[1].width.saturating_sub(3) as usize;
+                let width = horizontal[0].width.saturating_sub(3) as usize;
                 
                 // Full-width background for selected item
                 let base_style = if is_selected {
@@ -260,7 +211,7 @@ fn render_timeline_view(frame: &mut Frame, state: &AppState, area: Rect) {
     let mut list_state = ratatui::widgets::ListState::default();
     list_state.select(Some(state.selected_post));
     
-    frame.render_stateful_widget(timeline_list, horizontal[1], &mut list_state);
+    frame.render_stateful_widget(timeline_list, horizontal[0], &mut list_state);
 
     // Detail panel
     let detail_block = Block::default()
@@ -372,7 +323,7 @@ fn render_timeline_view(frame: &mut Frame, state: &AppState, area: Rect) {
             .block(detail_block)
             .wrap(Wrap { trim: false })
             .scroll((state.detail_scroll, 0));
-        frame.render_widget(detail, horizontal[2]);
+        frame.render_widget(detail, horizontal[1]);
     } else {
         let empty = Paragraph::new(vec![
             Line::from(""),
@@ -380,7 +331,7 @@ fn render_timeline_view(frame: &mut Frame, state: &AppState, area: Rect) {
             Line::styled("  Select a post", colors.text_muted()),
         ])
         .block(detail_block);
-        frame.render_widget(empty, horizontal[2]);
+        frame.render_widget(empty, horizontal[1]);
     }
 }
 

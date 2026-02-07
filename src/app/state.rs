@@ -17,22 +17,22 @@ pub struct ReplyItem {
 /// Which panel is currently focused
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum FocusedPanel {
-    /// Accounts sidebar panel
-    #[default]
+    /// Accounts sidebar panel (only in Accounts view)
     Accounts,
     /// Timeline posts list panel
+    #[default]
     Timeline,
     /// Post detail panel
     Detail,
 }
 
 impl FocusedPanel {
-    /// Get the next panel in tab order
+    /// Get the next panel in tab order (for Timeline view: Timeline <-> Detail)
     pub fn next(&self) -> Self {
         match self {
             Self::Accounts => Self::Timeline,
             Self::Timeline => Self::Detail,
-            Self::Detail => Self::Accounts,
+            Self::Detail => Self::Timeline,
         }
     }
 
@@ -40,7 +40,7 @@ impl FocusedPanel {
     pub fn prev(&self) -> Self {
         match self {
             Self::Accounts => Self::Detail,
-            Self::Timeline => Self::Accounts,
+            Self::Timeline => Self::Detail,
             Self::Detail => Self::Timeline,
         }
     }
