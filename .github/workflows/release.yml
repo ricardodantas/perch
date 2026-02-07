@@ -1,0 +1,296 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: 'Version bump type (none = release current version)'
+        required: true
+        default: 'none'
+        type: choice
+        options:
+          - none
+          - patch
+          - minor
+          - major
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      version: ${{ steps.bump.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-edit
+        if: inputs.bump != 'none'
+        run: cargo install cargo-edit
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Bump version
+        id: bump
+        run: |
+          # Get current version
+          CURRENT=$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[0].version')
+          echo "Current version: $CURRENT"
+
+          if [ "${{ inputs.bump }}" = "none" ]; then
+            echo "Releasing current version without bump"
+            NEW="$CURRENT"
+          else
+            # Bump version
+            cargo set-version --bump ${{ inputs.bump }}
+            NEW=$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[0].version')
+            echo "New version: $NEW"
+          fi
+
+          echo "version=$NEW" >> $GITHUB_OUTPUT
+
+      - name: Commit version bump
+        if: inputs.bump != 'none'
+        run: |
+          git add Cargo.toml Cargo.lock
+          git commit -m "chore: bump version to ${{ steps.bump.outputs.version }}"
+
+      - name: Create and push tag
+        run: |
+          VERSION="v${{ steps.bump.outputs.version }}"
+
+          # Check if tag already exists
+          if git rev-parse "$VERSION" >/dev/null 2>&1; then
+            echo "Tag $VERSION already exists"
+
+            # If bump=none, we're re-releasing - delete and recreate the tag
+            if [ "${{ inputs.bump }}" = "none" ]; then
+              echo "Re-releasing: deleting existing tag..."
+              git tag -d "$VERSION" || true
+              git push origin ":refs/tags/$VERSION" || true
+            else
+              echo "Error: Tag exists but we're bumping version. This shouldn't happen."
+              exit 1
+            fi
+          fi
+
+          git tag "$VERSION"
+          git push origin main --tags
+
+  build:
+    name: Build (${{ matrix.target }})
+    needs: release
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            archive: tar.gz
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+            archive: tar.gz
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-latest
+            archive: tar.gz
+          - target: x86_64-apple-darwin
+            os: macos-latest
+            archive: tar.gz
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            archive: tar.gz
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            archive: zip
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: v${{ needs.release.outputs.version }}
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install cross-compilation tools
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+
+      - name: Install musl tools
+        if: matrix.target == 'x86_64-unknown-linux-musl'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y musl-tools
+
+      - name: Build
+        run: cargo build --release --target ${{ matrix.target }}
+        env:
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
+
+      - name: Package (Unix)
+        if: matrix.os != 'windows-latest'
+        run: |
+          cd target/${{ matrix.target }}/release
+          tar -czvf ../../../perch-${{ needs.release.outputs.version }}-${{ matrix.target }}.tar.gz perch
+          cd ../../..
+
+      - name: Package (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          cd target/${{ matrix.target }}/release
+          7z a ../../../perch-${{ needs.release.outputs.version }}-${{ matrix.target }}.zip perch.exe
+          cd ../../..
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: perch-${{ matrix.target }}
+          path: perch-${{ needs.release.outputs.version }}-${{ matrix.target }}.*
+
+  github-release:
+    name: GitHub Release
+    needs: [release, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: v${{ needs.release.outputs.version }}
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Generate checksums
+        run: |
+          cd artifacts
+          find . -type f \( -name "*.tar.gz" -o -name "*.zip" \) -exec mv {} . \;
+          rm -rf perch-*/
+          sha256sum * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.release.outputs.version }}
+          name: v${{ needs.release.outputs.version }}
+          generate_release_notes: true
+          files: |
+            artifacts/*
+
+  publish-crates:
+    name: Publish to crates.io
+    needs: [release, github-release]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: v${{ needs.release.outputs.version }}
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Publish to crates.io
+        run: cargo publish --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+  update-homebrew:
+    name: Update Homebrew Tap
+    needs: [release, github-release]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for release assets
+        run: sleep 30
+
+      - name: Checkout homebrew-tap
+        uses: actions/checkout@v4
+        with:
+          repository: ricardodantas/homebrew-tap
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: homebrew-tap
+
+      - name: Update formula
+        run: |
+          VERSION="${{ needs.release.outputs.version }}"
+
+          # Download SHA256SUMS
+          curl -sL "https://github.com/ricardodantas/perch/releases/download/v${VERSION}/SHA256SUMS.txt" -o SHA256SUMS.txt
+
+          # Extract checksums for each platform
+          SHA_AARCH64_DARWIN=$(grep "aarch64-apple-darwin" SHA256SUMS.txt | cut -d' ' -f1)
+          SHA_X86_64_DARWIN=$(grep "x86_64-apple-darwin" SHA256SUMS.txt | cut -d' ' -f1)
+          SHA_AARCH64_LINUX=$(grep "aarch64-unknown-linux-gnu" SHA256SUMS.txt | cut -d' ' -f1)
+          SHA_X86_64_LINUX=$(grep "x86_64-unknown-linux-gnu" SHA256SUMS.txt | cut -d' ' -f1)
+
+          # Update formula with pre-built binaries
+          cat > homebrew-tap/Formula/perch.rb << EOF
+          class Perch < Formula
+            desc "Beautiful terminal social client for Mastodon and Bluesky"
+            homepage "https://github.com/ricardodantas/perch"
+            version "${VERSION}"
+            license "MIT"
+
+            on_macos do
+              on_arm do
+                url "https://github.com/ricardodantas/perch/releases/download/v#{version}/perch-#{version}-aarch64-apple-darwin.tar.gz"
+                sha256 "${SHA_AARCH64_DARWIN}"
+              end
+              on_intel do
+                url "https://github.com/ricardodantas/perch/releases/download/v#{version}/perch-#{version}-x86_64-apple-darwin.tar.gz"
+                sha256 "${SHA_X86_64_DARWIN}"
+              end
+            end
+
+            on_linux do
+              on_arm do
+                url "https://github.com/ricardodantas/perch/releases/download/v#{version}/perch-#{version}-aarch64-unknown-linux-gnu.tar.gz"
+                sha256 "${SHA_AARCH64_LINUX}"
+              end
+              on_intel do
+                url "https://github.com/ricardodantas/perch/releases/download/v#{version}/perch-#{version}-x86_64-unknown-linux-gnu.tar.gz"
+                sha256 "${SHA_X86_64_LINUX}"
+              end
+            end
+
+            def install
+              bin.install "perch"
+            end
+
+            test do
+              assert_match version.to_s, shell_output("#{bin}/perch --version")
+            end
+          end
+          EOF
+
+      - name: Commit and push
+        run: |
+          cd homebrew-tap
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Formula/perch.rb
+          git diff --staged --quiet || git commit -m "perch: update to v${{ needs.release.outputs.version }}"
+          git push
