@@ -312,26 +312,78 @@ fn handle_timeline_key(state: &mut AppState, key: KeyEvent) -> Option<AsyncComma
 }
 
 fn handle_accounts_key(state: &mut AppState, key: KeyEvent) -> Option<AsyncCommand> {
-    match key.code {
-        KeyCode::Down | KeyCode::Char('j') => {
+    match (key.modifiers, key.code) {
+        (_, KeyCode::Down | KeyCode::Char('j')) => {
             state.select_next_account();
             None
         }
-        KeyCode::Up | KeyCode::Char('k') => {
+        (_, KeyCode::Up | KeyCode::Char('k')) => {
             state.select_prev_account();
             None
         }
-        KeyCode::Char('g') => {
+        (_, KeyCode::Char('g')) => {
             state.selected_account = 0;
             None
         }
-        KeyCode::Char('G') if key.modifiers == KeyModifiers::SHIFT => {
+        (KeyModifiers::SHIFT, KeyCode::Char('G')) => {
             if !state.accounts.is_empty() {
                 state.selected_account = state.accounts.len() - 1;
             }
             None
         }
-        KeyCode::Esc => {
+        (_, KeyCode::Char('d')) => {
+            // Set as default account for this network
+            if let Some(account) = state.accounts.get(state.selected_account) {
+                let account_id = account.id;
+                let network = account.network;
+                if let Err(e) = state.db.set_default_account(account_id, network) {
+                    state.set_status(format!("❌ Failed to set default: {}", e));
+                } else {
+                    // Reload accounts to reflect change
+                    if let Ok(accounts) = state.db.get_accounts() {
+                        state.accounts = accounts;
+                    }
+                    state.set_status("★ Set as default account");
+                }
+            }
+            None
+        }
+        (KeyModifiers::SHIFT, KeyCode::Char('D')) => {
+            // Delete account
+            if let Some(account) = state.accounts.get(state.selected_account) {
+                let account_id = account.id;
+                let handle = account.handle.clone();
+                if let Err(e) = state.db.delete_account(account_id) {
+                    state.set_status(format!("❌ Failed to delete: {}", e));
+                } else {
+                    // Remove credentials
+                    let _ = crate::auth::delete_credentials(&state.accounts[state.selected_account]);
+                    // Reload accounts
+                    if let Ok(accounts) = state.db.get_accounts() {
+                        state.accounts = accounts;
+                        if state.selected_account >= state.accounts.len() && !state.accounts.is_empty() {
+                            state.selected_account = state.accounts.len() - 1;
+                        }
+                    }
+                    state.set_status(format!("🗑 Deleted @{}", handle));
+                }
+            }
+            None
+        }
+        (_, KeyCode::Enter) => {
+            // Switch to timeline view filtered by this account's network
+            if let Some(account) = state.accounts.get(state.selected_account) {
+                state.timeline_filter = match account.network {
+                    crate::models::Network::Mastodon => crate::app::state::TimelineFilter::Mastodon,
+                    crate::models::Network::Bluesky => crate::app::state::TimelineFilter::Bluesky,
+                };
+                state.view = crate::app::state::View::Timeline;
+                state.focused_panel = FocusedPanel::Timeline;
+                state.set_status(format!("Viewing {} timeline", account.network.emoji()));
+            }
+            None
+        }
+        (_, KeyCode::Esc) => {
             state.clear_status();
             None
         }

@@ -338,6 +338,15 @@ fn render_timeline_view(frame: &mut Frame, state: &AppState, area: Rect) {
 fn render_accounts_view(frame: &mut Frame, state: &AppState, area: Rect) {
     let colors = state.theme.colors();
 
+    // Split into main area and bottom bar for account actions
+    let layout = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Min(1), Constraint::Length(1)])
+        .split(area);
+
+    let main_area = layout[0];
+    let action_bar_area = layout[1];
+
     if state.accounts.is_empty() {
         let empty = Paragraph::new(vec![
             Line::from(""),
@@ -362,9 +371,12 @@ fn render_accounts_view(frame: &mut Frame, state: &AppState, area: Rect) {
                 .title(" 👤 Connected Accounts ")
                 .title_style(colors.text_primary()),
         );
-        frame.render_widget(empty, area);
+        frame.render_widget(empty, main_area);
         return;
     }
+
+    // Calculate width for full-line selection
+    let content_width = main_area.width.saturating_sub(2) as usize; // -2 for borders
 
     let items: Vec<ListItem> = state
         .accounts
@@ -373,34 +385,56 @@ fn render_accounts_view(frame: &mut Frame, state: &AppState, area: Rect) {
         .map(|(i, account)| {
             let is_selected = i == state.selected_account;
             let cursor = if is_selected { "▸" } else { " " };
-            let style = if is_selected {
+            
+            let bg_style = if is_selected {
                 colors.selected()
+            } else {
+                Style::default()
+            };
+
+            let network_style = if is_selected {
+                colors.selected().add_modifier(Modifier::BOLD)
+            } else {
+                match account.network {
+                    crate::models::Network::Mastodon => colors.network_mastodon(),
+                    crate::models::Network::Bluesky => colors.network_bluesky(),
+                }
+            };
+
+            let text_style = if is_selected {
+                colors.selected().add_modifier(Modifier::BOLD)
             } else {
                 colors.text()
             };
 
-            let network_style = match account.network {
-                crate::models::Network::Mastodon => colors.network_mastodon(),
-                crate::models::Network::Bluesky => colors.network_bluesky(),
+            let muted_style = if is_selected {
+                colors.selected()
+            } else {
+                colors.text_muted()
             };
 
+            let dim_style = if is_selected {
+                colors.selected()
+            } else {
+                colors.text_dim()
+            };
+
+            let default_marker = if account.is_default { " ★" } else { "" };
+
+            // Build lines with full-width background
+            let line1 = format!(" {} {} {} {}", cursor, account.network.emoji(), account.display_name, default_marker);
+            let line1_padded = format!("{:width$}", line1, width = content_width);
+            
+            let line2 = format!("     @{}", account.handle);
+            let line2_padded = format!("{:width$}", line2, width = content_width);
+            
+            let line3 = format!("     Server: {}", account.server);
+            let line3_padded = format!("{:width$}", line3, width = content_width);
+
             ListItem::new(vec![
-                Line::from(vec![
-                    Span::styled(format!(" {} ", cursor), style),
-                    Span::styled(account.network.emoji(), network_style),
-                    Span::styled(format!(" {} ", account.display_name), style.add_modifier(Modifier::BOLD)),
-                ]),
-                Line::from(vec![
-                    Span::styled("     ", style),
-                    Span::styled(format!("@{}", account.handle), colors.text_muted()),
-                ]),
-                Line::from(vec![
-                    Span::styled("     ", style),
-                    Span::styled(
-                        format!("Server: {}", account.server),
-                        colors.text_dim(),
-                    ),
-                ]),
+                Line::from(Span::styled(line1_padded, text_style.patch(bg_style))),
+                Line::from(Span::styled(line2_padded, muted_style.patch(bg_style))),
+                Line::from(Span::styled(line3_padded, dim_style.patch(bg_style))),
                 Line::from(""),
             ])
         })
@@ -415,7 +449,24 @@ fn render_accounts_view(frame: &mut Frame, state: &AppState, area: Rect) {
             .title_style(colors.text_primary()),
     );
 
-    frame.render_widget(list, area);
+    frame.render_widget(list, main_area);
+
+    // Render action bar with account-specific keys
+    let action_bar = Line::from(vec![
+        Span::styled(" ", Style::default().bg(colors.bg_secondary)),
+        Span::styled("[d]", colors.key_hint()),
+        Span::styled(" Set default  ", colors.text_muted()),
+        Span::styled("[D]", colors.key_hint()),
+        Span::styled(" Delete  ", colors.text_muted()),
+        Span::styled("[r]", colors.key_hint()),
+        Span::styled(" Refresh token  ", colors.text_muted()),
+        Span::styled("[Enter]", colors.key_hint()),
+        Span::styled(" View timeline", colors.text_muted()),
+    ]);
+
+    let action_bar_bg = Paragraph::new(action_bar)
+        .style(Style::default().bg(colors.bg_secondary));
+    frame.render_widget(action_bar_bg, action_bar_area);
 }
 
 fn render_status_bar(frame: &mut Frame, state: &AppState, area: Rect) {
