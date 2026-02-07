@@ -122,6 +122,10 @@ fn handle_async_result(state: &mut AppState, result: AsyncResult) {
             state.loading = false;
             state.set_status(format!("Loaded {} posts", state.posts.len()));
         }
+        AsyncResult::ContextFetched { post_id: _, replies } => {
+            state.current_replies = replies;
+            state.loading_replies = false;
+        }
         AsyncResult::Liked { post_id } => {
             // Update the post in our local state
             if let Some(post) = state.posts.iter_mut().find(|p| p.network_id == post_id) {
@@ -143,6 +147,13 @@ fn handle_async_result(state: &mut AppState, result: AsyncResult) {
                 post.repost_count += 1;
             }
             state.set_status("🔁 Reposted!");
+        }
+        AsyncResult::Unreposted { post_id } => {
+            if let Some(post) = state.posts.iter_mut().find(|p| p.network_id == post_id) {
+                post.reposted = false;
+                post.repost_count = post.repost_count.saturating_sub(1);
+            }
+            state.set_status("↩️ Unreposted");
         }
         AsyncResult::Posted { posts } => {
             let networks: Vec<_> = posts.iter().map(|p| p.network.emoji()).collect();

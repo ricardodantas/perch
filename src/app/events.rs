@@ -100,17 +100,39 @@ fn handle_timeline_key(state: &mut AppState, key: KeyEvent) -> Option<AsyncComma
         // Navigation within panel
         (_, KeyCode::Char('j') | KeyCode::Down) => {
             match state.focused_panel {
-                FocusedPanel::Accounts => state.select_next_account(),
-                FocusedPanel::Timeline | FocusedPanel::Detail => state.select_next_post(),
+                FocusedPanel::Accounts => {
+                    state.select_next_account();
+                    None
+                }
+                FocusedPanel::Timeline | FocusedPanel::Detail => {
+                    state.select_next_post();
+                    // Fetch replies for newly selected post
+                    if let Some(post) = state.selected_post().cloned() {
+                        if let Some(account) = find_account_for_post(state, &post) {
+                            return Some(AsyncCommand::FetchContext { post, account });
+                        }
+                    }
+                    None
+                }
             }
-            None
         }
         (_, KeyCode::Char('k') | KeyCode::Up) => {
             match state.focused_panel {
-                FocusedPanel::Accounts => state.select_prev_account(),
-                FocusedPanel::Timeline | FocusedPanel::Detail => state.select_prev_post(),
+                FocusedPanel::Accounts => {
+                    state.select_prev_account();
+                    None
+                }
+                FocusedPanel::Timeline | FocusedPanel::Detail => {
+                    state.select_prev_post();
+                    // Fetch replies for newly selected post
+                    if let Some(post) = state.selected_post().cloned() {
+                        if let Some(account) = find_account_for_post(state, &post) {
+                            return Some(AsyncCommand::FetchContext { post, account });
+                        }
+                    }
+                    None
+                }
             }
-            None
         }
 
         // Jump to top/bottom
@@ -181,11 +203,16 @@ fn handle_timeline_key(state: &mut AppState, key: KeyEvent) -> Option<AsyncComma
             None
         }
         (_, KeyCode::Char('r')) => {
-            // Repost/boost
+            // Repost/boost (toggle)
             if let Some(post) = state.selected_post().cloned() {
                 if let Some(account) = find_account_for_post(state, &post) {
-                    state.set_status("Reposting...");
-                    return Some(AsyncCommand::Repost { post, account });
+                    if post.reposted {
+                        state.set_status("Undoing repost...");
+                        return Some(AsyncCommand::Unrepost { post, account });
+                    } else {
+                        state.set_status("Reposting...");
+                        return Some(AsyncCommand::Repost { post, account });
+                    }
                 } else {
                     state.set_status("⚠ No matching account for this network");
                 }

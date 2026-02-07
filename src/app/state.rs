@@ -130,6 +130,10 @@ pub struct AppState {
     pub selected_post: usize,
     /// Scroll offset for timeline
     pub timeline_scroll: usize,
+    /// Replies to currently selected post
+    pub current_replies: Vec<Post>,
+    /// Loading replies?
+    pub loading_replies: bool,
 
     /// Compose text buffer
     pub compose_text: String,
@@ -182,6 +186,8 @@ impl AppState {
             posts,
             selected_post: 0,
             timeline_scroll: 0,
+            current_replies: Vec::new(),
+            loading_replies: false,
             compose_text: String::new(),
             compose_networks: vec![Network::Mastodon, Network::Bluesky],
             reply_to: None,
@@ -227,13 +233,23 @@ impl AppState {
     /// Move selection down in timeline
     pub fn select_next_post(&mut self) {
         if !self.posts.is_empty() {
+            let old = self.selected_post;
             self.selected_post = (self.selected_post + 1).min(self.posts.len() - 1);
+            if old != self.selected_post {
+                self.current_replies.clear();
+                self.loading_replies = true;
+            }
         }
     }
 
     /// Move selection up in timeline
     pub fn select_prev_post(&mut self) {
+        let old = self.selected_post;
         self.selected_post = self.selected_post.saturating_sub(1);
+        if old != self.selected_post {
+            self.current_replies.clear();
+            self.loading_replies = true;
+        }
     }
 
     /// Move selection down in accounts

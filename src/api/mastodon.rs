@@ -52,6 +52,32 @@ impl SocialApi for MastodonClient {
         Ok(statuses.into_iter().map(|s| s.into_post()).collect())
     }
 
+    async fn get_context(&self, post: &Post) -> Result<Vec<Post>> {
+        let url = self.api_url(&format!("/statuses/{}/context", post.network_id));
+
+        let response = self
+            .client
+            .get(&url)
+            .header("Authorization", format!("Bearer {}", self.access_token))
+            .send()
+            .await
+            .context("Failed to fetch context")?;
+
+        #[derive(Deserialize)]
+        struct ContextResponse {
+            ancestors: Vec<MastodonStatus>,
+            descendants: Vec<MastodonStatus>,
+        }
+
+        let context: ContextResponse = response
+            .json()
+            .await
+            .context("Failed to parse context response")?;
+
+        // Return descendants (replies) only
+        Ok(context.descendants.into_iter().map(|s| s.into_post()).collect())
+    }
+
     async fn post(&self, content: &str) -> Result<Post> {
         let url = self.api_url("/statuses");
 
@@ -152,6 +178,19 @@ impl SocialApi for MastodonClient {
             .send()
             .await
             .context("Failed to repost")?;
+
+        Ok(())
+    }
+
+    async fn unrepost(&self, post: &Post) -> Result<()> {
+        let url = self.api_url(&format!("/statuses/{}/unreblog", post.network_id));
+
+        self.client
+            .post(&url)
+            .header("Authorization", format!("Bearer {}", self.access_token))
+            .send()
+            .await
+            .context("Failed to unrepost")?;
 
         Ok(())
     }

@@ -14,12 +14,16 @@ use crate::models::{Account, Post};
 pub enum AsyncCommand {
     /// Refresh timeline for given accounts
     RefreshTimeline { accounts: Vec<Account> },
+    /// Fetch replies/context for a post
+    FetchContext { post: Post, account: Account },
     /// Like a post
     Like { post: Post, account: Account },
     /// Unlike a post
     Unlike { post: Post, account: Account },
     /// Repost/boost a post
     Repost { post: Post, account: Account },
+    /// Unrepost/unboost a post
+    Unrepost { post: Post, account: Account },
     /// Post to networks
     Post {
         content: String,
@@ -35,12 +39,16 @@ pub enum AsyncCommand {
 pub enum AsyncResult {
     /// Timeline refreshed with new posts
     TimelineRefreshed { posts: Vec<Post> },
+    /// Context/replies fetched for a post
+    ContextFetched { post_id: String, replies: Vec<Post> },
     /// Post was liked
     Liked { post_id: String },
     /// Post was unliked
     Unliked { post_id: String },
     /// Post was reposted
     Reposted { post_id: String },
+    /// Post was unreposted
+    Unreposted { post_id: String },
     /// New post created
     Posted { posts: Vec<Post> },
     /// An error occurred
@@ -70,6 +78,9 @@ pub fn spawn_worker() -> AsyncHandle {
                 AsyncCommand::RefreshTimeline { accounts } => {
                     handle_refresh(&result_tx, accounts).await;
                 }
+                AsyncCommand::FetchContext { post, account } => {
+                    handle_fetch_context(&result_tx, post, account).await;
+                }
                 AsyncCommand::Like { post, account } => {
                     handle_like(&result_tx, post, account).await;
                 }
@@ -78,6 +89,9 @@ pub fn spawn_worker() -> AsyncHandle {
                 }
                 AsyncCommand::Repost { post, account } => {
                     handle_repost(&result_tx, post, account).await;
+                }
+                AsyncCommand::Unrepost { post, account } => {
+                    handle_unrepost(&result_tx, post, account).await;
                 }
                 AsyncCommand::Post { content, accounts, reply_to } => {
                     handle_post(&result_tx, content, accounts, reply_to).await;
@@ -158,6 +172,32 @@ async fn handle_refresh(result_tx: &mpsc::Sender<AsyncResult>, accounts: Vec<Acc
 async fn fetch_timeline(account: &Account, token: &str) -> Result<Vec<Post>> {
     let client = get_client(account, token).await?;
     client.timeline(50).await
+}
+
+async fn handle_fetch_context(result_tx: &mpsc::Sender<AsyncResult>, post: Post, account: Account) {
+    let token = match auth::get_credentials(&account) {
+        Ok(Some(t)) => t,
+        _ => return,
+    };
+
+    let client = match get_client(&account, &token).await {
+        Ok(c) => c,
+        Err(_) => return,
+    };
+
+    match client.get_context(&post).await {
+        Ok(replies) => {
+            let _ = result_tx
+                .send(AsyncResult::ContextFetched {
+                    post_id: post.network_id,
+                    replies,
+                })
+                .await;
+        }
+        Err(_) => {
+            // Silently fail - replies are optional
+        }
+    }
 }
 
 async fn handle_like(result_tx: &mpsc::Sender<AsyncResult>, post: Post, account: Account) {
@@ -277,6 +317,42 @@ async fn handle_repost(result_tx: &mpsc::Sender<AsyncResult>, post: Post, accoun
             let _ = result_tx
                 .send(AsyncResult::Error {
                     message: format!("Repost failed: {}", e),
+                })
+                .await;
+        }
+    }
+}
+
+async fn handle_unrepost(result_tx: &mpsc::Sender<AsyncResult>, post: Post, account: Account) {
+    let token = match auth::get_credentials(&account) {
+        Ok(Some(t)) => t,
+        _ => return,
+    };
+
+    let client = match get_client(&account, &token).await {
+        Ok(c) => c,
+        Err(e) => {
+            let _ = result_tx
+                .send(AsyncResult::Error {
+                    message: e.to_string(),
+                })
+                .await;
+            return;
+        }
+    };
+
+    match client.unrepost(&post).await {
+        Ok(()) => {
+            let _ = result_tx
+                .send(AsyncResult::Unreposted {
+                    post_id: post.network_id,
+                })
+                .await;
+        }
+        Err(e) => {
+            let _ = result_tx
+                .send(AsyncResult::Error {
+                    message: format!("Unrepost failed: {}", e),
                 })
                 .await;
         }

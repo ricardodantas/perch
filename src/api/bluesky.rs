@@ -106,6 +106,33 @@ impl SocialApi for BlueskyClient {
             .collect())
     }
 
+    async fn get_context(&self, post: &Post) -> Result<Vec<Post>> {
+        let uri = post.uri.as_ref().context("Post missing URI for context")?;
+        
+        let url = format!(
+            "{}/xrpc/app.bsky.feed.getPostThread?uri={}&depth=10",
+            self.pds_url,
+            urlencoding::encode(uri)
+        );
+
+        let response = self
+            .client
+            .get(&url)
+            .header("Authorization", format!("Bearer {}", self.access_jwt))
+            .send()
+            .await
+            .context("Failed to fetch thread")?;
+
+        if !response.status().is_success() {
+            let error_text = response.text().await.unwrap_or_default();
+            bail!("Failed to fetch thread: {}", error_text);
+        }
+
+        // Thread response is complex - for now return empty
+        // Full implementation would parse the nested thread structure
+        Ok(Vec::new())
+    }
+
     async fn post(&self, content: &str) -> Result<Post> {
         let url = format!("{}/xrpc/com.atproto.repo.createRecord", self.pds_url);
 
@@ -438,6 +465,13 @@ impl SocialApi for BlueskyClient {
         }
 
         Ok(())
+    }
+
+    async fn unrepost(&self, post: &Post) -> Result<()> {
+        // For Bluesky, we need to find and delete the repost record
+        // This requires knowing the rkey of our repost, which we don't track
+        // For now, return an error - full implementation would need to search for the repost
+        bail!("Unrepost not yet implemented for Bluesky - refresh to update status")
     }
 
     async fn verify_credentials(&self) -> Result<Account> {

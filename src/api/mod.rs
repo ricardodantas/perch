@@ -13,6 +13,9 @@ pub trait SocialApi {
     /// Get the home timeline
     async fn timeline(&self, limit: usize) -> Result<Vec<Post>>;
 
+    /// Get replies/context for a post
+    async fn get_context(&self, post: &Post) -> Result<Vec<Post>>;
+
     /// Post a new status
     async fn post(&self, content: &str) -> Result<Post>;
 
@@ -27,6 +30,9 @@ pub trait SocialApi {
 
     /// Repost/boost a post
     async fn repost(&self, post: &Post) -> Result<()>;
+
+    /// Unrepost/unboost a post
+    async fn unrepost(&self, post: &Post) -> Result<()>;
 
     /// Verify credentials and get account info
     async fn verify_credentials(&self) -> Result<Account>;
@@ -46,6 +52,14 @@ impl Client {
         match self {
             Client::Mastodon(c) => c.timeline(limit).await,
             Client::Bluesky(c) => c.timeline(limit).await,
+        }
+    }
+
+    /// Get replies/context for a post
+    pub async fn get_context(&self, post: &Post) -> Result<Vec<Post>> {
+        match self {
+            Client::Mastodon(c) => c.get_context(post).await,
+            Client::Bluesky(c) => c.get_context(post).await,
         }
     }
 
@@ -86,6 +100,14 @@ impl Client {
         match self {
             Client::Mastodon(c) => c.repost(post).await,
             Client::Bluesky(c) => c.repost(post).await,
+        }
+    }
+
+    /// Unrepost/unboost a post
+    pub async fn unrepost(&self, post: &Post) -> Result<()> {
+        match self {
+            Client::Mastodon(c) => c.unrepost(post).await,
+            Client::Bluesky(c) => c.unrepost(post).await,
         }
     }
 

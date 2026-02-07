@@ -278,7 +278,7 @@ fn render_timeline_view(frame: &mut Frame, state: &AppState, area: Rect) {
         let like_icon = if post.liked { "❤️" } else { "♡" };
         let repost_icon = if post.reposted { "🔁" } else { "↻" };
         
-        let detail_content = vec![
+        let mut detail_content = vec![
             Line::from(""),
             Line::from(vec![
                 Span::styled("  ", Style::default()),
@@ -309,6 +309,39 @@ fn render_timeline_view(frame: &mut Frame, state: &AppState, area: Rect) {
                 Span::styled(format!("💬 {}", post.reply_count), colors.text_muted()),
             ]),
         ];
+        
+        // Add replies section
+        if !state.current_replies.is_empty() {
+            detail_content.push(Line::from(""));
+            detail_content.push(Line::from(vec![
+                Span::styled("  ── Replies ──────────────────────", colors.text_dim()),
+            ]));
+            
+            for reply in state.current_replies.iter().take(5) {
+                detail_content.push(Line::from(""));
+                detail_content.push(Line::from(vec![
+                    Span::styled("  ", Style::default()),
+                    Span::styled(format!("@{}", reply.author_handle), colors.text_primary()),
+                    Span::styled(format!(" · {}", reply.relative_time()), colors.text_muted()),
+                ]));
+                detail_content.push(Line::from(vec![
+                    Span::styled("    ", Style::default()),
+                    Span::styled(reply.preview(50), colors.text()),
+                ]));
+            }
+            
+            if state.current_replies.len() > 5 {
+                detail_content.push(Line::from(""));
+                detail_content.push(Line::from(vec![
+                    Span::styled(format!("  ... and {} more replies", state.current_replies.len() - 5), colors.text_dim()),
+                ]));
+            }
+        } else if state.loading_replies {
+            detail_content.push(Line::from(""));
+            detail_content.push(Line::from(vec![
+                Span::styled("  ⏳ Loading replies...", colors.text_muted()),
+            ]));
+        }
 
         let detail = Paragraph::new(detail_content)
             .block(detail_block)
