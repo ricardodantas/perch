@@ -7,6 +7,7 @@ mod ui;
 
 pub use state::AppState;
 pub use state::FocusedPanel;
+pub use state::ReplyItem;
 
 use anyhow::Result;
 use crossterm::{

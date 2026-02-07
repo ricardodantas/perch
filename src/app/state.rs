@@ -7,6 +7,13 @@ use crate::db::Database;
 use crate::models::{Account, Network, Post};
 use crate::theme::Theme;
 
+/// A reply with its depth level for display
+#[derive(Debug, Clone)]
+pub struct ReplyItem {
+    pub post: Post,
+    pub depth: usize,
+}
+
 /// Which panel is currently focused
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum FocusedPanel {
@@ -131,7 +138,7 @@ pub struct AppState {
     /// Scroll offset for timeline
     pub timeline_scroll: usize,
     /// Replies to currently selected post
-    pub current_replies: Vec<Post>,
+    pub current_replies: Vec<ReplyItem>,
     /// Loading replies?
     pub loading_replies: bool,
     /// Scroll offset for detail panel

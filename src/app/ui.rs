@@ -317,9 +317,12 @@ fn render_timeline_view(frame: &mut Frame, state: &AppState, area: Rect) {
                 Span::styled("  ── Replies ──────────────────────", colors.text_dim()),
             ]));
             
-            for (idx, reply) in state.current_replies.iter().take(10).enumerate() {
+            // Show all replies (no limit since we show nested structure)
+            for (idx, reply_item) in state.current_replies.iter().enumerate() {
                 let is_selected = state.selected_reply == Some(idx) && state.focused_panel == FocusedPanel::Detail;
-                let prefix = if is_selected { "▶ " } else { "  " };
+                let indent = "  ".repeat(reply_item.depth + 1);
+                let tree_char = if reply_item.depth > 0 { "└ " } else { "" };
+                let prefix = if is_selected { "▶" } else { " " };
                 let handle_style = if is_selected {
                     colors.text_primary().add_modifier(Modifier::BOLD).add_modifier(Modifier::REVERSED)
                 } else {
@@ -328,35 +331,34 @@ fn render_timeline_view(frame: &mut Frame, state: &AppState, area: Rect) {
                 
                 detail_content.push(Line::from(""));
                 detail_content.push(Line::from(vec![
+                    Span::styled(indent.clone(), Style::default()),
+                    Span::styled(tree_char, colors.text_dim()),
                     Span::styled(prefix, if is_selected { colors.text_primary() } else { Style::default() }),
-                    Span::styled(format!("@{}", reply.author_handle), handle_style),
-                    Span::styled(format!(" · {}", reply.relative_time()), colors.text_muted()),
+                    Span::styled(format!("@{}", reply_item.post.author_handle), handle_style),
+                    Span::styled(format!(" · {}", reply_item.post.relative_time()), colors.text_muted()),
                 ]));
+                
+                // Content indent (depth + 2 for alignment after handle)
+                let content_indent = "  ".repeat(reply_item.depth + 2);
+                
                 // Show full content
-                if reply.content.contains('\n') {
+                if reply_item.post.content.contains('\n') {
                     // Multi-line content
-                    for line in reply.content.lines() {
+                    for line in reply_item.post.content.lines() {
                         detail_content.push(Line::from(vec![
-                            Span::styled("    ", Style::default()),
+                            Span::styled(content_indent.clone(), Style::default()),
                             Span::styled(line.to_string(), colors.text()),
                         ]));
                     }
                 } else {
                     // Single line content
                     detail_content.push(Line::from(vec![
-                        Span::styled("    ", Style::default()),
-                        Span::styled(&reply.content, colors.text()),
+                        Span::styled(content_indent.clone(), Style::default()),
+                        Span::styled(reply_item.post.content.clone(), colors.text()),
                     ]));
                 }
                 detail_content.push(Line::from(vec![
-                    Span::styled(format!("    ♡ {}  ↻ {}  💬 {}", reply.like_count, reply.repost_count, reply.reply_count), colors.text_dim()),
-                ]));
-            }
-            
-            if state.current_replies.len() > 10 {
-                detail_content.push(Line::from(""));
-                detail_content.push(Line::from(vec![
-                    Span::styled(format!("  ... and {} more replies", state.current_replies.len() - 10), colors.text_dim()),
+                    Span::styled(format!("{}♡ {}  ↻ {}  💬 {}", content_indent, reply_item.post.like_count, reply_item.post.repost_count, reply_item.post.reply_count), colors.text_dim()),
                 ]));
             }
         } else if state.loading_replies {

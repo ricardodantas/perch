@@ -8,6 +8,7 @@ use tokio::sync::mpsc;
 use crate::api::get_client;
 use crate::auth;
 use crate::models::{Account, Post};
+use super::state::ReplyItem;
 
 /// Commands sent from the TUI to the async worker
 #[derive(Debug, Clone)]
@@ -40,7 +41,7 @@ pub enum AsyncResult {
     /// Timeline refreshed with new posts
     TimelineRefreshed { posts: Vec<Post> },
     /// Context/replies fetched for a post
-    ContextFetched { post_id: String, replies: Vec<Post> },
+    ContextFetched { post_id: String, replies: Vec<ReplyItem> },
     /// Post was liked
     Liked { post_id: String },
     /// Post was unliked
@@ -186,11 +187,14 @@ async fn handle_fetch_context(result_tx: &mpsc::Sender<AsyncResult>, post: Post,
     };
 
     match client.get_context(&post).await {
-        Ok(replies) => {
+        Ok(flat_replies) => {
+            // Build threaded reply list with depth
+            let reply_items = build_reply_tree(&post.network_id, &flat_replies);
+            
             let _ = result_tx
                 .send(AsyncResult::ContextFetched {
                     post_id: post.network_id,
-                    replies,
+                    replies: reply_items,
                 })
                 .await;
         }
@@ -198,6 +202,28 @@ async fn handle_fetch_context(result_tx: &mpsc::Sender<AsyncResult>, post: Post,
             // Silently fail - replies are optional
         }
     }
+}
+
+/// Build a flat list of replies with depth from a threaded structure
+fn build_reply_tree(root_id: &str, replies: &[Post]) -> Vec<ReplyItem> {
+    let mut result = Vec::new();
+    
+    // Find direct replies to the root and recursively add their children
+    fn add_replies(parent_id: &str, all_replies: &[Post], result: &mut Vec<ReplyItem>, depth: usize) {
+        for reply in all_replies {
+            if reply.reply_to_id.as_deref() == Some(parent_id) {
+                result.push(ReplyItem {
+                    post: reply.clone(),
+                    depth,
+                });
+                // Recursively add replies to this reply
+                add_replies(&reply.network_id, all_replies, result, depth + 1);
+            }
+        }
+    }
+    
+    add_replies(root_id, replies, &mut result, 0);
+    result
 }
 
 async fn handle_like(result_tx: &mpsc::Sender<AsyncResult>, post: Post, account: Account) {

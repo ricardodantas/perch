@@ -203,7 +203,7 @@ fn handle_timeline_key(state: &mut AppState, key: KeyEvent) -> Option<AsyncComma
             let reply_target = if state.focused_panel == FocusedPanel::Detail {
                 // If a reply is selected, reply to that reply
                 if let Some(idx) = state.selected_reply {
-                    state.current_replies.get(idx).cloned()
+                    state.current_replies.get(idx).map(|r| r.post.clone())
                 } else {
                     // Reply to main post
                     state.selected_post().cloned()
