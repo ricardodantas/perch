@@ -165,6 +165,32 @@ fn handle_timeline_key(state: &mut AppState, key: KeyEvent) -> Option<AsyncComma
             }
         }
 
+        // Scroll detail panel (Shift+J/K or Ctrl+D/U)
+        (KeyModifiers::SHIFT, KeyCode::Char('J')) => {
+            if state.focused_panel == FocusedPanel::Detail {
+                state.detail_scroll = state.detail_scroll.saturating_add(3);
+            }
+            None
+        }
+        (KeyModifiers::SHIFT, KeyCode::Char('K')) => {
+            if state.focused_panel == FocusedPanel::Detail {
+                state.detail_scroll = state.detail_scroll.saturating_sub(3);
+            }
+            None
+        }
+        (KeyModifiers::CONTROL, KeyCode::Char('d')) => {
+            if state.focused_panel == FocusedPanel::Detail {
+                state.detail_scroll = state.detail_scroll.saturating_add(10);
+            }
+            None
+        }
+        (KeyModifiers::CONTROL, KeyCode::Char('u')) => {
+            if state.focused_panel == FocusedPanel::Detail {
+                state.detail_scroll = state.detail_scroll.saturating_sub(10);
+            }
+            None
+        }
+
         // Jump to top/bottom
         (_, KeyCode::Char('g')) => {
             state.selected_post = 0;
