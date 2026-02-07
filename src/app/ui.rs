@@ -360,7 +360,8 @@ fn render_timeline_view(frame: &mut Frame, state: &AppState, area: Rect) {
 
         let detail = Paragraph::new(detail_content)
             .block(detail_block)
-            .wrap(Wrap { trim: false });
+            .wrap(Wrap { trim: false })
+            .scroll((state.detail_scroll, 0));
         frame.render_widget(detail, horizontal[2]);
     } else {
         let empty = Paragraph::new(vec![

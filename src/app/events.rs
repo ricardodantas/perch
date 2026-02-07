@@ -104,7 +104,12 @@ fn handle_timeline_key(state: &mut AppState, key: KeyEvent) -> Option<AsyncComma
                     state.select_next_account();
                     None
                 }
-                FocusedPanel::Timeline | FocusedPanel::Detail => {
+                FocusedPanel::Detail => {
+                    // Scroll detail panel down
+                    state.detail_scroll = state.detail_scroll.saturating_add(1);
+                    None
+                }
+                FocusedPanel::Timeline => {
                     state.select_next_post();
                     // Fetch replies for newly selected post
                     if let Some(post) = state.selected_post().cloned() {
@@ -122,7 +127,12 @@ fn handle_timeline_key(state: &mut AppState, key: KeyEvent) -> Option<AsyncComma
                     state.select_prev_account();
                     None
                 }
-                FocusedPanel::Timeline | FocusedPanel::Detail => {
+                FocusedPanel::Detail => {
+                    // Scroll detail panel up
+                    state.detail_scroll = state.detail_scroll.saturating_sub(1);
+                    None
+                }
+                FocusedPanel::Timeline => {
                     state.select_prev_post();
                     // Fetch replies for newly selected post
                     if let Some(post) = state.selected_post().cloned() {

@@ -134,6 +134,8 @@ pub struct AppState {
     pub current_replies: Vec<Post>,
     /// Loading replies?
     pub loading_replies: bool,
+    /// Scroll offset for detail panel
+    pub detail_scroll: u16,
 
     /// Compose text buffer
     pub compose_text: String,
@@ -188,6 +190,7 @@ impl AppState {
             timeline_scroll: 0,
             current_replies: Vec::new(),
             loading_replies: false,
+            detail_scroll: 0,
             compose_text: String::new(),
             compose_networks: vec![Network::Mastodon, Network::Bluesky],
             reply_to: None,
@@ -238,6 +241,7 @@ impl AppState {
             if old != self.selected_post {
                 self.current_replies.clear();
                 self.loading_replies = true;
+                self.detail_scroll = 0;
             }
         }
     }
@@ -249,6 +253,7 @@ impl AppState {
         if old != self.selected_post {
             self.current_replies.clear();
             self.loading_replies = true;
+            self.detail_scroll = 0;
         }
     }
 
