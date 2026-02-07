@@ -536,7 +536,7 @@ fn render_help_popup(frame: &mut Frame, state: &AppState) {
         ]),
         Line::from(vec![
             Span::styled("  j/k or ↑/↓       ", colors.key_hint()),
-            Span::styled("Navigate items", colors.text()),
+            Span::styled("Navigate items / replies", colors.text()),
         ]),
         Line::from(vec![
             Span::styled("  g/G              ", colors.key_hint()),
@@ -544,7 +544,7 @@ fn render_help_popup(frame: &mut Frame, state: &AppState) {
         ]),
         Line::from(""),
         Line::from(vec![Span::styled(
-            "  Timeline View",
+            "  Timeline Actions",
             colors.text_primary().add_modifier(Modifier::BOLD),
         )]),
         Line::from(vec![
@@ -553,11 +553,11 @@ fn render_help_popup(frame: &mut Frame, state: &AppState) {
         ]),
         Line::from(vec![
             Span::styled("  R                ", colors.key_hint()),
-            Span::styled("Reply to post", colors.text()),
+            Span::styled("Reply to post/reply", colors.text()),
         ]),
         Line::from(vec![
             Span::styled("  r                ", colors.key_hint()),
-            Span::styled("Repost/boost", colors.text()),
+            Span::styled("Repost/unrepost (toggle)", colors.text()),
         ]),
         Line::from(vec![
             Span::styled("  L                ", colors.key_hint()),
@@ -578,6 +578,48 @@ fn render_help_popup(frame: &mut Frame, state: &AppState) {
         Line::from(vec![
             Span::styled("  /                ", colors.key_hint()),
             Span::styled("Search posts", colors.text()),
+        ]),
+        Line::from(""),
+        Line::from(vec![Span::styled(
+            "  Detail Panel (post + replies)",
+            colors.text_primary().add_modifier(Modifier::BOLD),
+        )]),
+        Line::from(vec![
+            Span::styled("  j/k              ", colors.key_hint()),
+            Span::styled("Select reply", colors.text()),
+        ]),
+        Line::from(vec![
+            Span::styled("  J/K (shift)      ", colors.key_hint()),
+            Span::styled("Scroll content", colors.text()),
+        ]),
+        Line::from(vec![
+            Span::styled("  Ctrl+d/u         ", colors.key_hint()),
+            Span::styled("Page down/up", colors.text()),
+        ]),
+        Line::from(vec![
+            Span::styled("  R                ", colors.key_hint()),
+            Span::styled("Reply to selected reply", colors.text()),
+        ]),
+        Line::from(""),
+        Line::from(vec![Span::styled(
+            "  Compose",
+            colors.text_primary().add_modifier(Modifier::BOLD),
+        )]),
+        Line::from(vec![
+            Span::styled("  Alt+1            ", colors.key_hint()),
+            Span::styled("Toggle Mastodon", colors.text()),
+        ]),
+        Line::from(vec![
+            Span::styled("  Alt+2            ", colors.key_hint()),
+            Span::styled("Toggle Bluesky", colors.text()),
+        ]),
+        Line::from(vec![
+            Span::styled("  Ctrl+Enter       ", colors.key_hint()),
+            Span::styled("Send post", colors.text()),
+        ]),
+        Line::from(vec![
+            Span::styled("  Esc              ", colors.key_hint()),
+            Span::styled("Cancel", colors.text()),
         ]),
         Line::from(""),
         Line::from(vec![Span::styled(
