@@ -557,6 +557,7 @@ fn render_theme_picker(frame: &mut Frame, state: &AppState) {
     let colors = state.theme.colors();
     let area = frame.area();
 
+    // Same dimensions as Hazelnut: 50% width, 70% height
     let popup_area = centered_rect(50, 70, area);
     frame.render_widget(Clear, popup_area);
 
@@ -568,7 +569,7 @@ fn render_theme_picker(frame: &mut Frame, state: &AppState) {
             let palette = theme_name.palette();
             let selected = i == state.theme_picker_index;
 
-            // Create color preview squares
+            // Create color preview squares - exactly like Hazelnut
             let preview = format!(
                 "  {} {} ",
                 if selected { "▸" } else { " " },
