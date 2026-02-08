@@ -1,6 +1,7 @@
 //! Application state
 
 use anyhow::Result;
+use chrono::{DateTime, Utc};
 
 use crate::config::Config;
 use crate::db::Database;
@@ -158,6 +159,12 @@ pub struct AppState {
     pub compose_networks: Vec<Network>,
     /// Reply-to post (if replying)
     pub reply_to: Option<Post>,
+    /// Scheduled time (None = post immediately)
+    pub compose_schedule: Option<DateTime<Utc>>,
+    /// Schedule input text (for editing)
+    pub compose_schedule_input: String,
+    /// Is schedule input focused?
+    pub compose_schedule_focused: bool,
 
     /// Search query
     pub search_query: String,
@@ -219,6 +226,9 @@ impl AppState {
             compose_text: String::new(),
             compose_networks: vec![Network::Mastodon, Network::Bluesky],
             reply_to: None,
+            compose_schedule: None,
+            compose_schedule_input: String::new(),
+            compose_schedule_focused: false,
             search_query: String::new(),
             search_results: Vec::new(),
             status: String::new(),
@@ -343,6 +353,9 @@ impl AppState {
         self.mode = Mode::Compose;
         self.compose_text.clear();
         self.reply_to = None;
+        self.compose_schedule = None;
+        self.compose_schedule_input.clear();
+        self.compose_schedule_focused = false;
         // Pre-select networks based on configured accounts
         self.compose_networks = self
             .accounts
@@ -358,6 +371,9 @@ impl AppState {
         self.mode = Mode::Compose;
         self.compose_text = format!("@{} ", post.author_handle);
         self.reply_to = Some(post.clone());
+        self.compose_schedule = None;
+        self.compose_schedule_input.clear();
+        self.compose_schedule_focused = false;
         // Only select the network of the post we're replying to
         self.compose_networks = vec![post.network];
     }
@@ -366,6 +382,52 @@ impl AppState {
     pub fn close_compose(&mut self) {
         self.mode = Mode::Normal;
         self.reply_to = None;
+        self.compose_schedule = None;
+        self.compose_schedule_input.clear();
+        self.compose_schedule_focused = false;
+    }
+
+    /// Toggle schedule input focus
+    pub fn toggle_schedule_focus(&mut self) {
+        self.compose_schedule_focused = !self.compose_schedule_focused;
+    }
+
+    /// Parse and set schedule from input
+    pub fn apply_schedule_input(&mut self) -> Result<(), String> {
+        if self.compose_schedule_input.trim().is_empty() {
+            self.compose_schedule = None;
+            return Ok(());
+        }
+
+        match crate::schedule::parse_schedule_time(&self.compose_schedule_input) {
+            Ok(dt) => {
+                self.compose_schedule = Some(dt);
+                Ok(())
+            }
+            Err(e) => Err(e.to_string()),
+        }
+    }
+
+    /// Clear schedule
+    pub fn clear_schedule(&mut self) {
+        self.compose_schedule = None;
+        self.compose_schedule_input.clear();
+    }
+
+    /// Get schedule display text
+    pub fn schedule_display(&self) -> String {
+        if let Some(dt) = &self.compose_schedule {
+            let scheduled_post = crate::ScheduledPost::new("", vec![], *dt);
+            format!(
+                "{} (in {})",
+                dt.format("%Y-%m-%d %H:%M UTC"),
+                scheduled_post.time_until()
+            )
+        } else if !self.compose_schedule_input.is_empty() {
+            format!("⚠️ {}", self.compose_schedule_input)
+        } else {
+            "Now".to_string()
+        }
     }
 
     /// Toggle network in compose

@@ -426,68 +426,137 @@ fn handle_accounts_key(state: &mut AppState, key: KeyEvent) -> Option<AsyncComma
 }
 
 fn handle_compose_key(state: &mut AppState, key: KeyEvent) -> Option<AsyncCommand> {
-    match (key.modifiers, key.code) {
-        (_, KeyCode::Esc) => {
-            state.close_compose();
-            None
-        }
-        // Enter for new line
-        (KeyModifiers::NONE, KeyCode::Enter) => {
-            state.compose_text.push('\n');
-            None
-        }
-        // Ctrl+S to post
-        (KeyModifiers::CONTROL, KeyCode::Char('s')) => {
-            // Post
-            if !state.compose_text.is_empty() && !state.compose_networks.is_empty() {
-                let content = state.compose_text.clone();
-                let reply_to = state.reply_to.clone();
-                // Find accounts matching selected networks
-                let accounts: Vec<_> = state
-                    .accounts
-                    .iter()
-                    .filter(|a| state.compose_networks.contains(&a.network))
-                    .cloned()
-                    .collect();
-
-                if accounts.is_empty() {
-                    state.set_status("⚠ No accounts for selected networks");
-                    return None;
-                }
-
-                state.loading = true;
-                state.close_compose();
-                Some(AsyncCommand::Post {
-                    content,
-                    accounts,
-                    reply_to,
-                })
-            } else {
-                if state.compose_text.is_empty() {
-                    state.set_status("⚠ Write something first!");
-                } else {
-                    state.set_status("⚠ Select at least one network");
-                }
+    // Handle schedule input focus mode
+    if state.compose_schedule_focused {
+        match (key.modifiers, key.code) {
+            (_, KeyCode::Esc) => {
+                // Clear schedule and go back to text
+                state.compose_schedule_focused = false;
                 None
             }
+            (_, KeyCode::Tab) | (_, KeyCode::Enter) => {
+                // Apply schedule and go back to text
+                if let Err(e) = state.apply_schedule_input() {
+                    state.set_status(format!("⚠ Invalid schedule: {}", e));
+                } else if state.compose_schedule.is_some() {
+                    state.set_status("📅 Post scheduled");
+                }
+                state.compose_schedule_focused = false;
+                None
+            }
+            (KeyModifiers::CONTROL, KeyCode::Char('u')) => {
+                // Clear schedule input
+                state.compose_schedule_input.clear();
+                state.compose_schedule = None;
+                None
+            }
+            (_, KeyCode::Char(c)) => {
+                state.compose_schedule_input.push(c);
+                // Try to parse as we type
+                let _ = state.apply_schedule_input();
+                None
+            }
+            (_, KeyCode::Backspace) => {
+                state.compose_schedule_input.pop();
+                // Try to parse as we type
+                let _ = state.apply_schedule_input();
+                None
+            }
+            _ => None,
         }
-        (_, KeyCode::F(1)) => {
-            state.toggle_compose_network(Network::Mastodon);
-            None
+    } else {
+        // Normal compose mode (text input)
+        match (key.modifiers, key.code) {
+            (_, KeyCode::Esc) => {
+                state.close_compose();
+                None
+            }
+            // Enter for new line
+            (KeyModifiers::NONE, KeyCode::Enter) => {
+                state.compose_text.push('\n');
+                None
+            }
+            // Ctrl+S to post
+            (KeyModifiers::CONTROL, KeyCode::Char('s')) => {
+                // Post
+                if !state.compose_text.is_empty() && !state.compose_networks.is_empty() {
+                    let content = state.compose_text.clone();
+                    let reply_to = state.reply_to.clone();
+                    let schedule = state.compose_schedule;
+                    // Find accounts matching selected networks
+                    let accounts: Vec<_> = state
+                        .accounts
+                        .iter()
+                        .filter(|a| state.compose_networks.contains(&a.network))
+                        .cloned()
+                        .collect();
+
+                    if accounts.is_empty() {
+                        state.set_status("⚠ No accounts for selected networks");
+                        return None;
+                    }
+
+                    state.loading = true;
+                    state.close_compose();
+
+                    // If scheduled, save to database instead of posting
+                    if let Some(scheduled_for) = schedule {
+                        let networks: Vec<_> = accounts.iter().map(|a| a.network).collect();
+                        Some(AsyncCommand::SchedulePost {
+                            content,
+                            networks,
+                            scheduled_for,
+                        })
+                    } else {
+                        Some(AsyncCommand::Post {
+                            content,
+                            accounts,
+                            reply_to,
+                        })
+                    }
+                } else {
+                    if state.compose_text.is_empty() {
+                        state.set_status("⚠ Write something first!");
+                    } else {
+                        state.set_status("⚠ Select at least one network");
+                    }
+                    None
+                }
+            }
+            // Tab to switch to schedule input
+            (_, KeyCode::Tab) => {
+                state.compose_schedule_focused = true;
+                None
+            }
+            // F3 to toggle schedule focus
+            (_, KeyCode::F(3)) => {
+                state.toggle_schedule_focus();
+                None
+            }
+            // F4 to clear schedule
+            (_, KeyCode::F(4)) => {
+                state.clear_schedule();
+                state.set_status("📅 Schedule cleared - will post immediately");
+                None
+            }
+            (_, KeyCode::F(1)) => {
+                state.toggle_compose_network(Network::Mastodon);
+                None
+            }
+            (_, KeyCode::F(2)) => {
+                state.toggle_compose_network(Network::Bluesky);
+                None
+            }
+            (_, KeyCode::Char(c)) => {
+                state.compose_text.push(c);
+                None
+            }
+            (_, KeyCode::Backspace) => {
+                state.compose_text.pop();
+                None
+            }
+            _ => None,
         }
-        (_, KeyCode::F(2)) => {
-            state.toggle_compose_network(Network::Bluesky);
-            None
-        }
-        (_, KeyCode::Char(c)) => {
-            state.compose_text.push(c);
-            None
-        }
-        (_, KeyCode::Backspace) => {
-            state.compose_text.pop();
-            None
-        }
-        _ => None,
     }
 }
 

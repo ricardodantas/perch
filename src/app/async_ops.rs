@@ -8,7 +8,7 @@ use tokio::sync::mpsc;
 use super::state::ReplyItem;
 use crate::api::get_client;
 use crate::auth;
-use crate::models::{Account, Post};
+use crate::models::{Account, Network, Post};
 
 /// Commands sent from the TUI to the async worker
 #[derive(Debug, Clone)]
@@ -30,6 +30,12 @@ pub enum AsyncCommand {
         content: String,
         accounts: Vec<Account>,
         reply_to: Option<Post>,
+    },
+    /// Schedule a post for later
+    SchedulePost {
+        content: String,
+        networks: Vec<Network>,
+        scheduled_for: chrono::DateTime<chrono::Utc>,
     },
     /// Shutdown the worker
     Shutdown,
@@ -60,6 +66,8 @@ pub enum AsyncResult {
     Unreposted { post_id: String },
     /// New post created
     Posted { posts: Vec<Post> },
+    /// Post was scheduled
+    Scheduled { id: String, scheduled_for: String },
     /// An error occurred
     Error { message: String },
     /// Status message (for progress updates)
@@ -108,6 +116,13 @@ pub fn spawn_worker() -> AsyncHandle {
                     reply_to,
                 } => {
                     handle_post(&result_tx, content, accounts, reply_to).await;
+                }
+                AsyncCommand::SchedulePost {
+                    content,
+                    networks,
+                    scheduled_for,
+                } => {
+                    handle_schedule_post(&result_tx, content, networks, scheduled_for).await;
                 }
             }
         }
@@ -488,4 +503,57 @@ async fn handle_post(
             })
             .await;
     }
+}
+
+async fn handle_schedule_post(
+    result_tx: &mpsc::Sender<AsyncResult>,
+    content: String,
+    networks: Vec<Network>,
+    scheduled_for: chrono::DateTime<chrono::Utc>,
+) {
+    let _ = result_tx
+        .send(AsyncResult::Status {
+            message: "Scheduling post...".to_string(),
+        })
+        .await;
+
+    // Save to database
+    let db = match crate::Database::open() {
+        Ok(db) => db,
+        Err(e) => {
+            let _ = result_tx
+                .send(AsyncResult::Error {
+                    message: format!("Database error: {}", e),
+                })
+                .await;
+            return;
+        }
+    };
+
+    let scheduled_post = crate::ScheduledPost::new(content, networks, scheduled_for);
+    let id = scheduled_post.id.to_string();
+    let scheduled_for_str = scheduled_post.scheduled_time_display();
+    let time_until = scheduled_post.time_until();
+
+    if let Err(e) = db.save_scheduled_post(&scheduled_post) {
+        let _ = result_tx
+            .send(AsyncResult::Error {
+                message: format!("Failed to schedule: {}", e),
+            })
+            .await;
+        return;
+    }
+
+    let _ = result_tx
+        .send(AsyncResult::Scheduled {
+            id: id[..8].to_string(),
+            scheduled_for: scheduled_for_str.clone(),
+        })
+        .await;
+
+    let _ = result_tx
+        .send(AsyncResult::Status {
+            message: format!("📅 Scheduled for {} (in {})", scheduled_for_str, time_until),
+        })
+        .await;
 }

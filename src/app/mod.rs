@@ -209,6 +209,10 @@ fn handle_async_result(state: &mut AppState, result: AsyncResult) {
             state.set_status(format!("✅ Posted to {}", networks.join(" ")));
             state.loading = false;
         }
+        AsyncResult::Scheduled { id, scheduled_for } => {
+            state.set_status(format!("📅 Scheduled [{}] for {}", id, scheduled_for));
+            state.loading = false;
+        }
         AsyncResult::Error { message } => {
             state.set_status(format!("❌ {message}"));
             state.loading = false;

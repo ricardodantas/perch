@@ -991,8 +991,8 @@ fn render_compose_popup(frame: &mut Frame, state: &AppState) {
     let colors = state.theme.colors();
     let area = frame.area();
 
-    // Smaller dialog: 50% width, 40% height
-    let popup_area = centered_rect(50, 40, area);
+    // Slightly larger dialog to fit schedule: 55% width, 50% height
+    let popup_area = centered_rect(55, 50, area);
 
     // Clear and add background
     let bg_block = Block::default().style(Style::default().bg(colors.bg));
@@ -1056,23 +1056,68 @@ fn render_compose_popup(frame: &mut Frame, state: &AppState) {
     }
 
     content.push(Line::from(network_spans));
+
+    // Schedule row
+    let schedule_style = if state.compose_schedule_focused {
+        colors.selected()
+    } else {
+        colors.text_dim()
+    };
+    let schedule_display = state.schedule_display();
+    let schedule_icon = if state.compose_schedule.is_some() {
+        "📅"
+    } else {
+        "🕐"
+    };
+
+    content.push(Line::from(vec![
+        Span::styled("  ", Style::default()),
+        Span::styled(format!("{} Schedule: ", schedule_icon), schedule_style),
+        if state.compose_schedule_focused {
+            Span::styled(
+                if state.compose_schedule_input.is_empty() {
+                    "in 1h, 15:00, 2026-02-08 15:00...".to_string()
+                } else {
+                    state.compose_schedule_input.clone()
+                },
+                if state.compose_schedule_input.is_empty() {
+                    colors.text_muted()
+                } else if state.compose_schedule.is_some() {
+                    colors.text_primary()
+                } else {
+                    colors.text_error()
+                },
+            )
+        } else {
+            Span::styled(
+                schedule_display,
+                if state.compose_schedule.is_some() {
+                    colors.text_primary()
+                } else {
+                    colors.text_dim()
+                },
+            )
+        },
+    ]));
+
+    // Key hints
     content.push(Line::from(vec![
         Span::styled("  ", Style::default()),
         Span::styled("F1", colors.key_hint()),
         Span::styled("/", colors.text_dim()),
         Span::styled("F2", colors.key_hint()),
-        Span::styled(" toggle  ", colors.text_dim()),
+        Span::styled(" network  ", colors.text_dim()),
+        Span::styled("Tab", colors.key_hint()),
+        Span::styled(" schedule  ", colors.text_dim()),
         Span::styled("Ctrl+S", colors.key_hint()),
         Span::styled(" send  ", colors.text_dim()),
-        Span::styled("Enter", colors.key_hint()),
-        Span::styled(" newline  ", colors.text_dim()),
         Span::styled("Esc", colors.key_hint()),
         Span::styled(" cancel", colors.text_dim()),
     ]));
     content.push(Line::from(""));
 
     // Display compose text - handle multiple lines
-    if state.compose_text.is_empty() {
+    if state.compose_text.is_empty() && !state.compose_schedule_focused {
         content.push(Line::from(vec![
             Span::styled("  ", Style::default()),
             Span::styled(
@@ -1086,10 +1131,15 @@ fn render_compose_popup(frame: &mut Frame, state: &AppState) {
         ]));
     } else {
         // Split text by newlines and render each line
+        let text_style = if state.compose_schedule_focused {
+            colors.text_dim()
+        } else {
+            colors.text()
+        };
         for line in state.compose_text.split('\n') {
             content.push(Line::from(vec![
                 Span::styled("  ", Style::default()),
-                Span::styled(line.to_string(), colors.text()),
+                Span::styled(line.to_string(), text_style),
             ]));
         }
     }
@@ -1106,6 +1156,8 @@ fn render_compose_popup(frame: &mut Frame, state: &AppState) {
 
     let title = if state.reply_to.is_some() {
         " ↩ Reply ".to_string()
+    } else if state.compose_schedule.is_some() {
+        " 📅 Schedule Post ".to_string()
     } else {
         " 📝 Compose ".to_string()
     };
@@ -1124,22 +1176,36 @@ fn render_compose_popup(frame: &mut Frame, state: &AppState) {
 
     frame.render_widget(compose, popup_area);
 
-    // Show cursor position - adjust for reply context and network line
+    // Show cursor position
     let reply_offset = if state.reply_to.is_some() { 2u16 } else { 0 };
-    let network_offset = 3u16; // network pills + hint line + empty line
+    let network_offset = 4u16; // network pills + schedule + hint line + empty line
 
-    // Count lines properly - split('\n') includes empty trailing line
-    let text_lines: Vec<&str> = state.compose_text.split('\n').collect();
-    let line_count = text_lines.len();
-    let last_line_len = text_lines.last().map_or(0, |l| l.len());
+    if state.compose_schedule_focused {
+        // Cursor in schedule input field
+        let schedule_prefix = "  📅 Schedule: ".len() as u16;
+        let input_len = state.compose_schedule_input.len() as u16;
+        let cursor_x = popup_area.x + schedule_prefix + input_len;
+        let cursor_y = popup_area.y + 2 + reply_offset + 1; // After network row
+        if cursor_x < popup_area.x + popup_area.width - 1 {
+            frame.set_cursor_position((cursor_x, cursor_y));
+        }
+    } else {
+        // Cursor in text area
+        let text_lines: Vec<&str> = state.compose_text.split('\n').collect();
+        let line_count = text_lines.len();
+        let last_line_len = text_lines.last().map_or(0, |l| l.len());
 
-    let cursor_x = popup_area.x + 3 + last_line_len as u16;
-    let cursor_y =
-        popup_area.y + 2 + reply_offset + network_offset + (line_count.saturating_sub(1)) as u16;
-    if cursor_x < popup_area.x + popup_area.width - 1
-        && cursor_y < popup_area.y + popup_area.height - 2
-    {
-        frame.set_cursor_position((cursor_x, cursor_y));
+        let cursor_x = popup_area.x + 3 + last_line_len as u16;
+        let cursor_y = popup_area.y
+            + 2
+            + reply_offset
+            + network_offset
+            + (line_count.saturating_sub(1)) as u16;
+        if cursor_x < popup_area.x + popup_area.width - 1
+            && cursor_y < popup_area.y + popup_area.height - 2
+        {
+            frame.set_cursor_position((cursor_x, cursor_y));
+        }
     }
 }
 

@@ -77,6 +77,7 @@ enum ScheduleSubcommand {
     List,
     Cancel { id: String },
     Run,
+    Daemon { interval: u64 },
 }
 
 fn parse_args() -> Result<Command> {
@@ -151,9 +152,19 @@ fn parse_args() -> Result<Command> {
                     ScheduleSubcommand::Cancel { id }
                 }
                 Some("run" | "process") => ScheduleSubcommand::Run,
+                Some("daemon" | "watch") => {
+                    // Parse --interval flag (default 60 seconds)
+                    let interval = args
+                        .iter()
+                        .position(|a| a == "--interval" || a == "-i")
+                        .and_then(|i| args.get(i + 1))
+                        .and_then(|s| s.parse().ok())
+                        .unwrap_or(60);
+                    ScheduleSubcommand::Daemon { interval }
+                }
                 Some(other) => {
                     return Err(anyhow::anyhow!(
-                        "Unknown schedule subcommand: {}\nTry: list, cancel, run",
+                        "Unknown schedule subcommand: {}\nTry: list, cancel, run, daemon",
                         other
                     ));
                 }
@@ -214,10 +225,15 @@ COMMANDS:
         list                           List pending scheduled posts
         cancel <id>                    Cancel a scheduled post
         run                            Process due scheduled posts
+        daemon [OPTIONS]               Run continuously, processing posts
+      Options (daemon):
+        -i, --interval <secs>          Check interval in seconds (default: 60)
       Examples:
         perch schedule list
         perch schedule cancel abc123
         perch schedule run
+        perch schedule daemon
+        perch schedule daemon --interval 30
 
     timeline [network] [OPTIONS]       Show timeline
       Options:
@@ -556,96 +572,128 @@ async fn schedule_cli(subcommand: ScheduleSubcommand) -> Result<()> {
             println!("📤 Processing {} scheduled post(s)...\n", due_posts.len());
 
             for post in due_posts {
-                let id_short = &post.id.to_string()[..8];
-                println!(
-                    "Processing [{}]: \"{}\"",
-                    id_short,
-                    truncate_content(&post.content, 40)
-                );
+                process_scheduled_post(&db, &post).await?;
+                println!();
+            }
+        }
 
-                // Mark as posting
-                db.update_scheduled_post_status(
-                    post.id,
-                    perch::ScheduledPostStatus::Posting,
-                    None,
-                )?;
+        ScheduleSubcommand::Daemon { interval } => {
+            println!(
+                "🕐 Starting scheduler daemon (checking every {}s)",
+                interval
+            );
+            println!("   Press Ctrl+C to stop\n");
 
-                let mut success = true;
-                let mut error_msg = String::new();
+            // Set up Ctrl+C handler
+            let running = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(true));
+            let r = running.clone();
+            ctrlc::set_handler(move || {
+                r.store(false, std::sync::atomic::Ordering::SeqCst);
+            })?;
 
-                for network in &post.networks {
-                    let account = if let Some(a) = db.get_default_account(*network)? {
-                        a
-                    } else {
-                        let msg = format!("No {} account configured", network.name());
-                        println!("  ⚠️  {}", msg);
-                        error_msg = msg;
-                        success = false;
-                        continue;
-                    };
+            while running.load(std::sync::atomic::Ordering::SeqCst) {
+                let due_posts = db.get_due_scheduled_posts()?;
 
-                    let token = if let Some(t) = perch::auth::get_credentials(&account)? {
-                        t
-                    } else {
-                        let msg = format!("No credentials for {}", account.handle);
-                        println!("  ⚠️  {}", msg);
-                        error_msg = msg;
-                        success = false;
-                        continue;
-                    };
+                if !due_posts.is_empty() {
+                    println!(
+                        "[{}] Processing {} due post(s)...",
+                        chrono::Local::now().format("%H:%M:%S"),
+                        due_posts.len()
+                    );
 
-                    match perch::api::get_client(&account, &token).await {
-                        Ok(client) => match client.post(&post.content).await {
-                            Ok(posted) => {
-                                if let Some(url) = &posted.url {
-                                    println!(
-                                        "  {} ✓ Posted to {}: {}",
-                                        network.emoji(),
-                                        network.name(),
-                                        url
-                                    );
-                                } else {
-                                    println!(
-                                        "  {} ✓ Posted to {}",
-                                        network.emoji(),
-                                        network.name()
-                                    );
-                                }
-                            }
-                            Err(e) => {
-                                let msg = format!("Failed to post to {}: {}", network.name(), e);
-                                println!("  {} ✗ {}", network.emoji(), msg);
-                                error_msg = msg;
-                                success = false;
-                            }
-                        },
-                        Err(e) => {
-                            let msg = format!("Failed to connect to {}: {}", network.name(), e);
-                            println!("  {} ✗ {}", network.emoji(), msg);
-                            error_msg = msg;
-                            success = false;
-                        }
+                    for post in due_posts {
+                        process_scheduled_post(&db, &post).await?;
                     }
                 }
 
-                // Update status
-                if success {
-                    db.update_scheduled_post_status(
-                        post.id,
-                        perch::ScheduledPostStatus::Posted,
-                        None,
-                    )?;
-                    println!("  ✅ Done\n");
-                } else {
-                    db.update_scheduled_post_status(
-                        post.id,
-                        perch::ScheduledPostStatus::Failed,
-                        Some(&error_msg),
-                    )?;
-                    println!("  ❌ Failed\n");
+                // Sleep in small increments to allow Ctrl+C to work
+                for _ in 0..interval {
+                    if !running.load(std::sync::atomic::Ordering::SeqCst) {
+                        break;
+                    }
+                    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                 }
             }
+
+            println!("\n👋 Daemon stopped");
         }
+    }
+
+    Ok(())
+}
+
+/// Process a single scheduled post
+async fn process_scheduled_post(db: &perch::Database, post: &perch::ScheduledPost) -> Result<()> {
+    let id_short = &post.id.to_string()[..8];
+    println!(
+        "  [{}]: \"{}\"",
+        id_short,
+        truncate_content(&post.content, 40)
+    );
+
+    // Mark as posting
+    db.update_scheduled_post_status(post.id, perch::ScheduledPostStatus::Posting, None)?;
+
+    let mut success = true;
+    let mut error_msg = String::new();
+
+    for network in &post.networks {
+        let account = if let Some(a) = db.get_default_account(*network)? {
+            a
+        } else {
+            let msg = format!("No {} account configured", network.name());
+            println!("    ⚠️  {}", msg);
+            error_msg = msg;
+            success = false;
+            continue;
+        };
+
+        let token = if let Some(t) = perch::auth::get_credentials(&account)? {
+            t
+        } else {
+            let msg = format!("No credentials for {}", account.handle);
+            println!("    ⚠️  {}", msg);
+            error_msg = msg;
+            success = false;
+            continue;
+        };
+
+        match perch::api::get_client(&account, &token).await {
+            Ok(client) => match client.post(&post.content).await {
+                Ok(posted) => {
+                    if let Some(url) = &posted.url {
+                        println!("    {} ✓ {}: {}", network.emoji(), network.name(), url);
+                    } else {
+                        println!("    {} ✓ {}", network.emoji(), network.name());
+                    }
+                }
+                Err(e) => {
+                    let msg = format!("Failed to post to {}: {}", network.name(), e);
+                    println!("    {} ✗ {}", network.emoji(), msg);
+                    error_msg = msg;
+                    success = false;
+                }
+            },
+            Err(e) => {
+                let msg = format!("Failed to connect to {}: {}", network.name(), e);
+                println!("    {} ✗ {}", network.emoji(), msg);
+                error_msg = msg;
+                success = false;
+            }
+        }
+    }
+
+    // Update status
+    if success {
+        db.update_scheduled_post_status(post.id, perch::ScheduledPostStatus::Posted, None)?;
+        println!("    ✅ Done");
+    } else {
+        db.update_scheduled_post_status(
+            post.id,
+            perch::ScheduledPostStatus::Failed,
+            Some(&error_msg),
+        )?;
+        println!("    ❌ Failed");
     }
 
     Ok(())

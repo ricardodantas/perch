@@ -65,6 +65,7 @@ regex-lite = "0.1.9"
 
 # TOML for config
 toml = "0.9"
+ctrlc = { version = "3.5.1", features = ["termination"] }
 
 [dev-dependencies]
 tokio-test = "0.4"
