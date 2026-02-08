@@ -20,6 +20,7 @@ const baseUrl = import.meta.env.BASE_URL;
           <li><a href="#tui">TUI Mode</a></li>
           <li><a href="#cli">CLI Commands</a></li>
           <li><a href="#posting">Posting</a></li>
+          <li><a href="#scheduled-posts">Scheduled Posts</a></li>
         </ul>
 
         <h3>Keybindings</h3>
@@ -266,6 +267,60 @@ perch accounts remove &lt;account-id&gt;</code></pre>
         <h3>From the CLI</h3>
         <div class="code-block">
           <pre><code>perch post "Your message here"</code></pre>
+        </div>
+      </section>
+
+      <section id="scheduled-posts">
+        <h2>Scheduled Posts</h2>
+        <p>Schedule posts to be sent at a specific time. Perch stores scheduled posts locally and processes them when you run <code>perch schedule run</code>.</p>
+
+        <h3>Schedule a Post</h3>
+        <div class="code-block">
+          <div class="code-header">
+            <span>Schedule for later</span>
+            <button class="copy-btn" data-copy="perch post &quot;Good morning!&quot; --schedule &quot;in 2h&quot;">Copy</button>
+          </div>
+          <pre><code># Relative time
+perch post "Good morning!" --schedule "in 2h"
+perch post "Reminder!" --schedule "in 30 minutes"
+
+# Specific date and time
+perch post "Happy Friday!" --schedule "2026-02-14 09:00"
+
+# Time today (or tomorrow if past)
+perch post "Lunch time!" --schedule "12:00"</code></pre>
+        </div>
+
+        <h3>Time Formats</h3>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr><th>Format</th><th>Example</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Relative (short)</td><td><code>"in 5m"</code>, <code>"in 2h"</code>, <code>"in 1d"</code></td></tr>
+              <tr><td>Relative (long)</td><td><code>"in 30 minutes"</code>, <code>"in 2 hours"</code></td></tr>
+              <tr><td>Time today</td><td><code>"15:00"</code>, <code>"3pm"</code></td></tr>
+              <tr><td>Date + time</td><td><code>"2026-02-08 15:00"</code></td></tr>
+              <tr><td>ISO 8601</td><td><code>"2026-02-08T15:00:00"</code></td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>Manage Scheduled Posts</h3>
+        <div class="code-block">
+          <pre><code># List pending posts
+perch schedule list
+
+# Cancel a scheduled post (use ID prefix)
+perch schedule cancel abc123
+
+# Process all due posts
+perch schedule run</code></pre>
+        </div>
+
+        <div class="info-box">
+          <strong>💡 Tip:</strong> Run <code>perch schedule run</code> periodically (via cron or manually) to process scheduled posts. Posts are stored locally until processed.
         </div>
       </section>
 
@@ -620,6 +675,18 @@ post_limit = 50</code></pre>
     justify-content: center;
     font-weight: 700;
     flex-shrink: 0;
+  }
+
+  .info-box {
+    background: var(--bg-tertiary);
+    border-left: 4px solid var(--accent-cyan);
+    padding: 1rem 1.25rem;
+    border-radius: 0 8px 8px 0;
+    margin: 1.5rem 0;
+  }
+
+  .info-box strong {
+    color: var(--accent-cyan);
   }
 
   .screenshot-gallery {

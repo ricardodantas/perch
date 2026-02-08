@@ -265,6 +265,28 @@ perch post "Spoiler content" --cw "Movie spoilers"
 perch post "Check this out!" --media ~/photo.jpg
 ```
 
+#### Scheduled Posts
+
+```bash
+# Schedule a post for later
+perch post "Good morning!" --schedule "in 2h"
+perch post "Happy Friday!" --schedule "2026-02-14 09:00" --to mastodon,bluesky
+
+# List pending scheduled posts
+perch schedule list
+
+# Cancel a scheduled post
+perch schedule cancel abc123
+
+# Process due scheduled posts
+perch schedule run
+```
+
+**Schedule time formats:**
+- Relative: `"in 5m"`, `"in 2h"`, `"in 1d"`, `"in 30 minutes"`
+- Time today: `"15:00"`, `"3pm"` (schedules for tomorrow if past)
+- Date+time: `"2026-02-08 15:00"`, `"2026-02-08T15:00"`
+
 #### Timeline
 
 ```bash
