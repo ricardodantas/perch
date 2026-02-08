@@ -397,8 +397,8 @@ fn handle_compose_key(state: &mut AppState, key: KeyEvent) -> Option<AsyncComman
             state.close_compose();
             None
         }
-        // Ctrl+Enter for new line
-        (KeyModifiers::CONTROL, KeyCode::Enter) => {
+        // Ctrl+J for new line (traditional Unix newline)
+        (KeyModifiers::CONTROL, KeyCode::Char('j')) => {
             state.compose_text.push('\n');
             None
         }
