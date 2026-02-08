@@ -397,14 +397,13 @@ fn handle_compose_key(state: &mut AppState, key: KeyEvent) -> Option<AsyncComman
             state.close_compose();
             None
         }
-        // Ctrl+J for new line (traditional Unix newline)
-        (KeyModifiers::CONTROL, KeyCode::Char('j')) => {
+        // Enter for new line
+        (KeyModifiers::NONE, KeyCode::Enter) => {
             state.compose_text.push('\n');
             None
         }
-        // Enter or Ctrl+S to post
-        (KeyModifiers::NONE, KeyCode::Enter) 
-        | (KeyModifiers::CONTROL, KeyCode::Char('s')) => {
+        // Ctrl+S to post
+        (KeyModifiers::CONTROL, KeyCode::Char('s')) => {
             // Post
             if !state.compose_text.is_empty() && !state.compose_networks.is_empty() {
                 let content = state.compose_text.clone();
