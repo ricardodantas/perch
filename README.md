@@ -1,6 +1,10 @@
 <p align="center">
-  <h1 align="center">🐦 Perch</h1>
+  <img src="screenshots/01-timeline.png" alt="Perch Timeline" width="700">
 </p>
+
+<h1 align="center">
+  🐦 Perch
+</h1>
 
 <p align="center">
   <strong>A beautiful terminal social client for Mastodon and Bluesky</strong>
@@ -33,6 +37,7 @@
 ## 📖 Table of Contents
 
 - [✨ Features](#-features)
+- [📸 Screenshots](#-screenshots)
 - [🚀 Quick Start](#-quick-start)
 - [🔐 Authentication](#-authentication)
 - [💻 Usage](#-usage)
@@ -91,6 +96,46 @@ Credentials stored safely in your system keyring. Never worry about plaintext to
 | 📅 **Scheduled Posts** | Queue posts for optimal timing |
 | 🔔 **Notifications** | Desktop alerts for mentions |
 | 🖼️ **Media Support** | Attach images to posts |
+
+<br>
+
+## 📸 Screenshots
+
+<details>
+<summary><strong>Timeline View</strong> — Browse posts from all your networks</summary>
+<br>
+<img src="screenshots/01-timeline.png" alt="Timeline View" width="800">
+</details>
+
+<details>
+<summary><strong>Compose Post</strong> — Write once, post everywhere</summary>
+<br>
+<img src="screenshots/06-compose.png" alt="Compose Dialog" width="800">
+</details>
+
+<details>
+<summary><strong>Accounts</strong> — Manage your connected accounts</summary>
+<br>
+<img src="screenshots/07-accounts.png" alt="Accounts View" width="800">
+</details>
+
+<details>
+<summary><strong>Keyboard Shortcuts</strong> — Vim-style navigation</summary>
+<br>
+<img src="screenshots/02-help.png" alt="Help Dialog" width="800">
+</details>
+
+<details>
+<summary><strong>Theme Picker</strong> — 15 beautiful themes</summary>
+<br>
+<img src="screenshots/03-theme-picker.png" alt="Theme Picker" width="800">
+</details>
+
+<details>
+<summary><strong>About</strong> — Version info and links</summary>
+<br>
+<img src="screenshots/08-about.png" alt="About Dialog" width="800">
+</details>
 
 <br>
 
