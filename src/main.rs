@@ -196,8 +196,7 @@ fn print_help() {
         .map_or_else(|_| "Unknown".to_string(), |p| p.display().to_string());
 
     println!(
-        r#"{}
-🐦 Perch - A beautiful terminal social client
+        r#"🐦 Perch - A beautiful terminal social client
 
 USAGE:
     perch                              Launch TUI
@@ -274,13 +273,11 @@ KEYBINDINGS (TUI):
       ?             Help
 
 CONFIG:
-    {}
+    {config_path}
 
 HOMEPAGE:
     https://github.com/ricardodantas/perch
-"#,
-        perch::LOGO,
-        config_path
+"#
     );
 }
 
