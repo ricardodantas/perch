@@ -1,4 +1,4 @@
-name: Deploy Website
+name: Deploy to GitHub Pages
 
 on:
   push:
@@ -38,7 +38,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Copy screenshots
+      - name: Copy assets from root
         run: |
           cp -r ../screenshots public/
 

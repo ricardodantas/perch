@@ -4,59 +4,166 @@ import Layout from '../layouts/Layout.astro';
 const baseUrl = import.meta.env.BASE_URL;
 
 const themes = [
-  { name: 'Dracula', emoji: '🦇', description: 'Dark purple aesthetic' },
-  { name: 'One Dark Pro', emoji: '🌙', description: "Atom's iconic dark theme" },
-  { name: 'Nord', emoji: '❄️', description: 'Arctic, bluish color palette' },
-  { name: 'Catppuccin Mocha', emoji: '🐱', description: 'Warm pastel dark theme' },
-  { name: 'Catppuccin Latte', emoji: '☕', description: 'Warm pastel light theme' },
-  { name: 'Gruvbox Dark', emoji: '🎸', description: 'Retro groove colors' },
-  { name: 'Gruvbox Light', emoji: '📜', description: 'Retro groove, light variant' },
-  { name: 'Tokyo Night', emoji: '🌃', description: 'Futuristic dark blue' },
-  { name: 'Solarized Dark', emoji: '🌅', description: 'Precision colors, dark' },
-  { name: 'Solarized Light', emoji: '🌞', description: 'Precision colors, light' },
-  { name: 'Monokai Pro', emoji: '🎨', description: 'Classic syntax highlighting' },
-  { name: 'Rosé Pine', emoji: '🌹', description: 'All natural pine with soho vibes' },
-  { name: 'Kanagawa', emoji: '🌊', description: 'Inspired by Katsushika Hokusai' },
-  { name: 'Everforest', emoji: '🌲', description: 'Comfortable green forest theme' },
-  { name: 'Cyberpunk', emoji: '🌆', description: 'Neon-soaked futuristic theme' },
+  {
+    name: 'Dracula',
+    slug: 'dracula',
+    description: 'A dark theme for vampires',
+    colors: ['#282a36', '#bd93f9', '#ff79c6', '#50fa7b', '#f1fa8c'],
+    default: true
+  },
+  {
+    name: 'One Dark Pro',
+    slug: 'one-dark-pro',
+    description: "Atom's iconic dark theme",
+    colors: ['#282c34', '#61afef', '#c678dd', '#98c379', '#e5c07b']
+  },
+  {
+    name: 'Nord',
+    slug: 'nord',
+    description: 'An arctic, north-bluish color palette',
+    colors: ['#2e3440', '#81a1c1', '#88c0d0', '#a3be8c', '#ebcb8b']
+  },
+  {
+    name: 'Catppuccin Mocha',
+    slug: 'catppuccin-mocha',
+    description: 'Soothing pastel theme for the high-spirited',
+    colors: ['#1e1e2e', '#cba6f7', '#f5c2e7', '#a6e3a1', '#f9e2af']
+  },
+  {
+    name: 'Catppuccin Latte',
+    slug: 'catppuccin-latte',
+    description: 'Warm pastel light theme',
+    colors: ['#eff1f5', '#8839ef', '#ea76cb', '#40a02b', '#df8e1d']
+  },
+  {
+    name: 'Gruvbox Dark',
+    slug: 'gruvbox-dark',
+    description: 'Retro groove color scheme',
+    colors: ['#282828', '#fabd2f', '#b8bb26', '#fb4934', '#83a598']
+  },
+  {
+    name: 'Gruvbox Light',
+    slug: 'gruvbox-light',
+    description: 'Retro groove, light variant',
+    colors: ['#fbf1c7', '#b57614', '#79740e', '#9d0006', '#076678']
+  },
+  {
+    name: 'Tokyo Night',
+    slug: 'tokyo-night',
+    description: 'A clean, dark theme inspired by Tokyo nights',
+    colors: ['#1a1b26', '#7aa2f7', '#bb9af7', '#9ece6a', '#e0af68']
+  },
+  {
+    name: 'Solarized Dark',
+    slug: 'solarized-dark',
+    description: 'Precision colors for machines and people',
+    colors: ['#002b36', '#268bd2', '#d33682', '#859900', '#b58900']
+  },
+  {
+    name: 'Solarized Light',
+    slug: 'solarized-light',
+    description: 'Precision colors, light variant',
+    colors: ['#fdf6e3', '#268bd2', '#d33682', '#859900', '#b58900']
+  },
+  {
+    name: 'Monokai Pro',
+    slug: 'monokai-pro',
+    description: 'Classic Sublime Text colors',
+    colors: ['#272822', '#66d9ef', '#f92672', '#a6e22e', '#e6db74']
+  },
+  {
+    name: 'Rosé Pine',
+    slug: 'rose-pine',
+    description: 'All natural pine, faux fur and a bit of soho vibes',
+    colors: ['#191724', '#c4a7e7', '#ebbcba', '#31748f', '#f6c177']
+  },
+  {
+    name: 'Kanagawa',
+    slug: 'kanagawa',
+    description: 'Inspired by the colors of the famous wave painting',
+    colors: ['#1f1f28', '#7e9cd8', '#957fb8', '#98bb6c', '#e6c384']
+  },
+  {
+    name: 'Everforest',
+    slug: 'everforest',
+    description: 'Comfortable and pleasant green forest theme',
+    colors: ['#2d353b', '#a7c080', '#83c092', '#7fbbb3', '#dbbc7f']
+  },
+  {
+    name: 'Cyberpunk',
+    slug: 'cyberpunk',
+    description: 'Neon-soaked night city aesthetic',
+    colors: ['#0d0d1a', '#00ffff', '#ff00ff', '#00ff00', '#ffff00']
+  }
 ];
 ---
 
 <Layout title="Themes - Perch">
-  <div class="themes-page">
-    <div class="container">
-      <div class="page-header">
-        <h1>🎨 Themes</h1>
-        <p>Perch includes 15 beautiful color themes. Press <kbd>t</kbd> in the TUI to open the theme picker.</p>
-      </div>
-
-      <div class="theme-preview">
-        <img src={`${baseUrl}screenshots/03-theme-picker.png`} alt="Theme picker in Perch" loading="lazy" />
-      </div>
-
-      <div class="themes-grid">
-        {themes.map(theme => (
-          <div class="theme-card">
-            <div class="theme-emoji">{theme.emoji}</div>
-            <h3>{theme.name}</h3>
+  <section class="themes-page">
+    <div class="themes-header">
+      <h1>🎨 Themes</h1>
+      <p>Perch comes with 15 beautiful color schemes to match your style.</p>
+      <p class="hint">Press <kbd>t</kbd> in the TUI to open the theme picker.</p>
+    </div>
+    
+    <div class="themes-showcase">
+      <img src={`${baseUrl}screenshots/03-theme-picker.png`} alt="Theme picker interface" class="theme-picker-preview" loading="lazy" />
+    </div>
+    
+    <div class="themes-grid">
+      {themes.map((theme) => (
+        <div class={`theme-card ${theme.default ? 'default' : ''}`}>
+          <div class="theme-preview" style={`background: ${theme.colors[0]}`}>
+            <div class="color-dots">
+              {theme.colors.slice(1).map((color) => (
+                <span class="color-dot" style={`background: ${color}`}></span>
+              ))}
+            </div>
+          </div>
+          <div class="theme-info">
+            <h3>
+              {theme.name}
+              {theme.default && <span class="default-badge">Default</span>}
+            </h3>
             <p>{theme.description}</p>
           </div>
-        ))}
+        </div>
+      ))}
+    </div>
+    
+    <div class="themes-extra">
+      <h2>Screenshots</h2>
+      <p>See Perch in action with different themes:</p>
+      
+      <div class="screenshot-gallery">
+        <figure>
+          <img src={`${baseUrl}screenshots/01-timeline.png`} alt="Timeline with Catppuccin Mocha theme" loading="lazy" />
+          <figcaption>Timeline - Catppuccin Mocha Theme</figcaption>
+        </figure>
+        <figure>
+          <img src={`${baseUrl}screenshots/05-nord-theme.png`} alt="Timeline with Nord theme" loading="lazy" />
+          <figcaption>Timeline - Nord Theme</figcaption>
+        </figure>
+        <figure>
+          <img src={`${baseUrl}screenshots/06-compose.png`} alt="Compose dialog" loading="lazy" />
+          <figcaption>Compose Dialog</figcaption>
+        </figure>
       </div>
+    </div>
 
-      <div class="usage-section">
-        <h2>Setting a Theme</h2>
-        <p>There are two ways to set your theme:</p>
+    <div class="usage-section">
+      <h2>Setting a Theme</h2>
+      <p>There are two ways to set your theme:</p>
 
-        <h3>1. Interactive Theme Picker</h3>
-        <p>Press <kbd>t</kbd> while in the TUI to open the theme picker. Use <kbd>↑</kbd>/<kbd>↓</kbd> to navigate and <kbd>Enter</kbd> to apply.</p>
+      <h3>1. Interactive Theme Picker</h3>
+      <p>Press <kbd>t</kbd> while in the TUI to open the theme picker. Use <kbd>↑</kbd>/<kbd>↓</kbd> to navigate and <kbd>Enter</kbd> to apply.</p>
 
-        <h3>2. Configuration File</h3>
-        <p>Set your preferred theme in <code>~/.config/perch/config.toml</code>:</p>
-        <pre><code>theme = "dracula"</code></pre>
+      <h3>2. Configuration File</h3>
+      <p>Set your preferred theme in <code>~/.config/perch/config.toml</code>:</p>
+      <pre><code>theme = "dracula"</code></pre>
 
-        <h3>Available Theme Names</h3>
-        <pre><code>{`dracula
+      <h3>Available Theme Names</h3>
+      <pre><code>{`dracula
 one-dark-pro
 nord
 catppuccin-mocha
@@ -71,36 +178,39 @@ rose-pine
 kanagawa
 everforest
 cyberpunk`}</code></pre>
-      </div>
     </div>
-  </div>
+  </section>
 </Layout>
 
 <style>
   .themes-page {
     padding: calc(var(--nav-height) + 3rem) 1.5rem 4rem;
-  }
-
-  .container {
-    max-width: var(--max-width);
+    max-width: 1200px;
     margin: 0 auto;
   }
-
-  .page-header {
+  
+  .themes-header {
     text-align: center;
     margin-bottom: 3rem;
   }
-
-  .page-header h1 {
-    font-size: 2.5rem;
+  
+  .themes-header h1 {
+    font-size: clamp(2rem, 5vw, 3rem);
     margin-bottom: 1rem;
   }
-
-  .page-header p {
+  
+  .themes-header p {
     color: var(--text-secondary);
     font-size: 1.125rem;
+    max-width: 600px;
+    margin: 0 auto;
   }
-
+  
+  .themes-header .hint {
+    margin-top: 1rem;
+    font-size: 0.9rem;
+  }
+  
   kbd {
     background: var(--bg-tertiary);
     border: 1px solid var(--text-secondary);
@@ -109,54 +219,132 @@ cyberpunk`}</code></pre>
     font-family: var(--font-mono);
     font-size: 0.85em;
   }
-
-  .theme-preview {
-    text-align: center;
+  
+  .themes-showcase {
     margin-bottom: 4rem;
+    text-align: center;
   }
-
-  .theme-preview img {
+  
+  .theme-picker-preview {
     max-width: 100%;
     border-radius: 12px;
     box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
     border: 1px solid var(--bg-tertiary);
   }
-
+  
   .themes-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
     gap: 1.5rem;
     margin-bottom: 4rem;
   }
-
+  
   .theme-card {
     background: var(--bg-secondary);
-    padding: 1.5rem;
     border-radius: 12px;
+    overflow: hidden;
     border: 1px solid var(--bg-tertiary);
-    text-align: center;
     transition: transform 0.2s, border-color 0.2s;
   }
-
+  
   .theme-card:hover {
     transform: translateY(-4px);
     border-color: var(--accent-purple);
   }
-
-  .theme-emoji {
-    font-size: 2rem;
+  
+  .theme-card.default {
+    border-color: var(--accent-purple);
+  }
+  
+  .theme-preview {
+    height: 120px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    padding-bottom: 1rem;
+  }
+  
+  .color-dots {
+    display: flex;
+    gap: 0.5rem;
+  }
+  
+  .color-dot {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  }
+  
+  .theme-info {
+    padding: 1.25rem;
+  }
+  
+  .theme-info h3 {
+    font-size: 1.125rem;
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  
+  .default-badge {
+    font-size: 0.7rem;
+    background: var(--accent-purple);
+    color: var(--bg-primary);
+    padding: 0.2em 0.5em;
+    border-radius: 4px;
+    font-weight: 500;
+    text-transform: uppercase;
+  }
+  
+  .theme-info p {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    margin: 0;
+  }
+  
+  .themes-extra {
+    margin-top: 4rem;
+  }
+  
+  .themes-extra h2 {
+    font-size: 1.75rem;
     margin-bottom: 0.75rem;
   }
-
-  .theme-card h3 {
-    font-size: 1rem;
-    margin-bottom: 0.5rem;
+  
+  .themes-extra > p {
+    color: var(--text-secondary);
+    margin-bottom: 2rem;
   }
-
-  .theme-card p {
+  
+  .screenshot-gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1.5rem;
+  }
+  
+  .screenshot-gallery figure {
+    margin: 0;
+  }
+  
+  .screenshot-gallery img {
+    width: 100%;
+    border-radius: 8px;
+    border: 1px solid var(--bg-tertiary);
+    transition: transform 0.2s;
+  }
+  
+  .screenshot-gallery img:hover {
+    transform: scale(1.02);
+  }
+  
+  .screenshot-gallery figcaption {
+    margin-top: 0.75rem;
     font-size: 0.875rem;
     color: var(--text-secondary);
-    margin: 0;
+    text-align: center;
   }
 
   .usage-section {
@@ -164,6 +352,7 @@ cyberpunk`}</code></pre>
     padding: 2rem;
     border-radius: 12px;
     border: 1px solid var(--bg-tertiary);
+    margin-top: 4rem;
   }
 
   .usage-section h2 {
@@ -187,19 +376,30 @@ cyberpunk`}</code></pre>
   .usage-section pre {
     margin-top: 0.5rem;
   }
-
+  
   @media (max-width: 768px) {
     .themes-page {
-      padding: calc(var(--nav-height) + 2rem) 1rem 3rem;
+      padding: calc(var(--nav-height) + 2rem) 1rem 2rem;
     }
-
+    
     .themes-grid {
-      grid-template-columns: repeat(2, 1fr);
-      gap: 1rem;
+      grid-template-columns: 1fr;
     }
-
-    .theme-card {
-      padding: 1rem;
+    
+    .screenshot-gallery {
+      grid-template-columns: 1fr;
+    }
+    
+    .theme-picker-preview {
+      max-width: 100%;
+    }
+    
+    h1 {
+      font-size: 2rem;
+    }
+    
+    h2 {
+      font-size: 1.5rem;
     }
 
     .usage-section {
