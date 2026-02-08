@@ -278,14 +278,21 @@ perch schedule list
 # Cancel a scheduled post
 perch schedule cancel abc123
 
-# Process due scheduled posts
+# Process due scheduled posts (one-time)
 perch schedule run
+
+# Run scheduler daemon (continuous)
+perch schedule daemon
+perch schedule daemon --interval 30  # Check every 30 seconds
 ```
 
 **Schedule time formats:**
 - Relative: `"in 5m"`, `"in 2h"`, `"in 1d"`, `"in 30 minutes"`
 - Time today: `"15:00"`, `"3pm"` (schedules for tomorrow if past)
 - Date+time: `"2026-02-08 15:00"`, `"2026-02-08T15:00"`
+
+**TUI Scheduling:**
+In the compose dialog (`n`), press `Tab` to switch to the schedule input field. Type your schedule time and it validates in real-time. Press `Tab` or `Enter` to confirm, `F4` to clear.
 
 #### Timeline
 

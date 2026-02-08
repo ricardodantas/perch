@@ -714,12 +714,24 @@ fn render_help_popup(frame: &mut Frame, state: &AppState) {
             Span::styled("Toggle Bluesky", colors.text()),
         ]),
         Line::from(vec![
+            Span::styled("  Tab              ", colors.key_hint()),
+            Span::styled("Toggle schedule input", colors.text()),
+        ]),
+        Line::from(vec![
+            Span::styled("  F3               ", colors.key_hint()),
+            Span::styled("Quick toggle schedule", colors.text()),
+        ]),
+        Line::from(vec![
+            Span::styled("  F4               ", colors.key_hint()),
+            Span::styled("Clear schedule", colors.text()),
+        ]),
+        Line::from(vec![
             Span::styled("  Ctrl+S           ", colors.key_hint()),
-            Span::styled("Send post", colors.text()),
+            Span::styled("Send/schedule post", colors.text()),
         ]),
         Line::from(vec![
             Span::styled("  Enter            ", colors.key_hint()),
-            Span::styled("New line", colors.text()),
+            Span::styled("New line / Confirm schedule", colors.text()),
         ]),
         Line::from(vec![
             Span::styled("  Backspace        ", colors.key_hint()),

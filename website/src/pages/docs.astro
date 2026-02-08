@@ -315,13 +315,40 @@ perch schedule list
 # Cancel a scheduled post (use ID prefix)
 perch schedule cancel abc123
 
-# Process all due posts
-perch schedule run</code></pre>
+# Process all due posts (one-time)
+perch schedule run
+
+# Run scheduler daemon (continuous)
+perch schedule daemon
+
+# Custom check interval (seconds)
+perch schedule daemon --interval 30</code></pre>
         </div>
 
         <div class="info-box">
-          <strong>💡 Tip:</strong> Run <code>perch schedule run</code> periodically (via cron or manually) to process scheduled posts. Posts are stored locally until processed.
+          <strong>💡 Tip:</strong> Use <code>perch schedule daemon</code> for continuous processing, or add <code>perch schedule run</code> to cron for periodic checks. Posts are stored locally in SQLite.
         </div>
+
+        <h3>TUI Scheduling</h3>
+        <p>You can also schedule posts directly from the TUI compose dialog:</p>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Key</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td><kbd>Tab</kbd></td><td>Toggle schedule input focus</td></tr>
+              <tr><td><kbd>F3</kbd></td><td>Quick toggle schedule focus</td></tr>
+              <tr><td><kbd>F4</kbd></td><td>Clear schedule (post immediately)</td></tr>
+              <tr><td><kbd>Enter</kbd></td><td>Confirm schedule input</td></tr>
+              <tr><td><kbd>Ctrl+U</kbd></td><td>Clear schedule input (while editing)</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>Type schedule times like <code>in 2h</code> or <code>15:00</code> and see real-time validation. The dialog title changes to "📅 Schedule Post" when a schedule is set.</p>
       </section>
 
       <section id="navigation">
