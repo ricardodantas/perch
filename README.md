@@ -146,14 +146,17 @@ Credentials stored safely in your system keyring. Never worry about plaintext to
 #### macOS
 
 ```bash
-# Homebrew (coming soon)
+# Homebrew (recommended - fast, pre-built binary)
 brew install ricardodantas/tap/perch
 ```
 
 #### Linux
 
 ```bash
-# Via Cargo
+# Homebrew (recommended)
+brew install ricardodantas/tap/perch
+
+# Or via Cargo
 cargo install perch
 ```
 
@@ -163,6 +166,8 @@ cargo install perch
 # Via Cargo (requires Rust toolchain)
 cargo install perch
 ```
+
+Or download `perch-*-x86_64-pc-windows-msvc.zip` from [GitHub Releases](https://github.com/ricardodantas/perch/releases).
 
 #### From Source
 

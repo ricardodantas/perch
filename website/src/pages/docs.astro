@@ -47,6 +47,19 @@ const baseUrl = import.meta.env.BASE_URL;
         <h2>Installation</h2>
 
         <h3>macOS</h3>
+        <p>The fastest way to install on macOS — uses pre-built binaries:</p>
+
+        <div class="code-block">
+          <div class="code-header">
+            <span>Homebrew (Recommended)</span>
+            <button class="copy-btn" data-copy="brew install ricardodantas/tap/perch">Copy</button>
+          </div>
+          <pre><code>brew install ricardodantas/tap/perch</code></pre>
+        </div>
+
+        <h3>Linux</h3>
+        <p>Homebrew works on Linux too, or use Cargo:</p>
+
         <div class="code-block">
           <div class="code-header">
             <span>Homebrew</span>
@@ -55,7 +68,6 @@ const baseUrl = import.meta.env.BASE_URL;
           <pre><code>brew install ricardodantas/tap/perch</code></pre>
         </div>
 
-        <h3>Linux / Windows</h3>
         <div class="code-block">
           <div class="code-header">
             <span>Cargo</span>
@@ -63,6 +75,19 @@ const baseUrl = import.meta.env.BASE_URL;
           </div>
           <pre><code>cargo install perch</code></pre>
         </div>
+
+        <h3>Windows</h3>
+        <p>Install via Cargo or download the pre-built binary:</p>
+
+        <div class="code-block">
+          <div class="code-header">
+            <span>Cargo</span>
+            <button class="copy-btn" data-copy="cargo install perch">Copy</button>
+          </div>
+          <pre><code>cargo install perch</code></pre>
+        </div>
+
+        <p>Or download <code>perch-*-x86_64-pc-windows-msvc.zip</code> from <a href="https://github.com/ricardodantas/perch/releases">GitHub Releases</a>.</p>
 
         <h3>From Source</h3>
         <div class="code-block">
@@ -92,8 +117,8 @@ cargo build --release</code></pre>
             <div>
               <h4>Install Perch</h4>
               <div class="code-block inline">
-                <pre><code>cargo install perch</code></pre>
-                <button class="copy-btn small" data-copy="cargo install perch">Copy</button>
+                <pre><code>brew install ricardodantas/tap/perch</code></pre>
+                <button class="copy-btn small" data-copy="brew install ricardodantas/tap/perch">Copy</button>
               </div>
             </div>
           </div>

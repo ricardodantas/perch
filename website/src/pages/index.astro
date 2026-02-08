@@ -22,13 +22,13 @@ const baseUrl = import.meta.env.BASE_URL;
 
       <div class="install-box">
         <div class="install-tabs">
-          <button class="install-tab active" data-tab="cargo">Cargo</button>
-          <button class="install-tab" data-tab="homebrew">Homebrew</button>
+          <button class="install-tab active" data-tab="homebrew">Homebrew</button>
+          <button class="install-tab" data-tab="cargo">Cargo</button>
         </div>
         <div class="install-commands">
-          <div class="install-command active" id="cargo-cmd">
-            <code>cargo install perch</code>
-            <button class="copy-btn" data-copy="cargo install perch" aria-label="Copy to clipboard">
+          <div class="install-command active" id="homebrew-cmd">
+            <code>brew install ricardodantas/tap/perch</code>
+            <button class="copy-btn" data-copy="brew install ricardodantas/tap/perch" aria-label="Copy to clipboard">
               <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
                 <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
                 <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
@@ -36,9 +36,9 @@ const baseUrl = import.meta.env.BASE_URL;
               <span class="copy-text">Copy</span>
             </button>
           </div>
-          <div class="install-command" id="homebrew-cmd">
-            <code>brew install ricardodantas/tap/perch</code>
-            <button class="copy-btn" data-copy="brew install ricardodantas/tap/perch" aria-label="Copy to clipboard">
+          <div class="install-command" id="cargo-cmd">
+            <code>cargo install perch</code>
+            <button class="copy-btn" data-copy="cargo install perch" aria-label="Copy to clipboard">
               <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
                 <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
                 <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
@@ -187,15 +187,15 @@ const baseUrl = import.meta.env.BASE_URL;
           <div class="step-content">
             <h3>Install</h3>
             <div class="step-code">
-              <code>cargo install perch</code>
-              <button class="copy-btn small" data-copy="cargo install perch" aria-label="Copy">
+              <code>brew install ricardodantas/tap/perch</code>
+              <button class="copy-btn small" data-copy="brew install ricardodantas/tap/perch" aria-label="Copy">
                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
                   <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
                   <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
                 </svg>
               </button>
             </div>
-            <p class="step-alt">or <code>brew install ricardodantas/tap/perch</code></p>
+            <p class="step-alt">or <code>cargo install perch</code></p>
           </div>
         </div>
 
