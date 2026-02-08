@@ -1,4 +1,4 @@
-//! Database module for SQLite storage (accounts, drafts, cache, scheduled posts)
+//! Database module for `SQLite` storage (accounts, drafts, cache, scheduled posts)
 
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
@@ -44,7 +44,7 @@ impl Database {
     /// Initialize the database schema
     fn init(&self) -> Result<()> {
         self.conn.execute_batch(
-            r#"
+            r"
             -- Accounts table
             CREATE TABLE IF NOT EXISTS accounts (
                 id TEXT PRIMARY KEY,
@@ -113,7 +113,7 @@ impl Database {
             CREATE INDEX IF NOT EXISTS idx_post_cache_cached_at ON post_cache(cached_at);
             CREATE INDEX IF NOT EXISTS idx_scheduled_posts_status ON scheduled_posts(status);
             CREATE INDEX IF NOT EXISTS idx_scheduled_posts_scheduled_for ON scheduled_posts(scheduled_for);
-            "#,
+            ",
         )?;
 
         Ok(())
@@ -124,15 +124,15 @@ impl Database {
     /// Insert a new account
     pub fn insert_account(&self, account: &Account) -> Result<()> {
         self.conn.execute(
-            r#"INSERT INTO accounts (id, network, display_name, handle, server, is_default, avatar_url, created_at, last_used_at)
-               VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)"#,
+            r"INSERT INTO accounts (id, network, display_name, handle, server, is_default, avatar_url, created_at, last_used_at)
+               VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
             params![
                 account.id.to_string(),
                 format!("{:?}", account.network).to_lowercase(),
                 account.display_name,
                 account.handle,
                 account.server,
-                account.is_default as i32,
+                i32::from(account.is_default),
                 account.avatar_url,
                 account.created_at.to_rfc3339(),
                 account.last_used_at.map(|dt| dt.to_rfc3339()),
@@ -175,7 +175,7 @@ impl Database {
 
     /// Get accounts for a specific network
     pub fn get_accounts_for_network(&self, network: Network) -> Result<Vec<Account>> {
-        let network_str = format!("{:?}", network).to_lowercase();
+        let network_str = format!("{network:?}").to_lowercase();
         let mut stmt = self.conn.prepare(
             "SELECT id, network, display_name, handle, server, is_default, avatar_url, created_at, last_used_at 
              FROM accounts WHERE network = ?1 ORDER BY display_name"
@@ -208,7 +208,7 @@ impl Database {
 
     /// Get the default account for a network
     pub fn get_default_account(&self, network: Network) -> Result<Option<Account>> {
-        let network_str = format!("{:?}", network).to_lowercase();
+        let network_str = format!("{network:?}").to_lowercase();
         let mut stmt = self.conn.prepare(
             "SELECT id, network, display_name, handle, server, is_default, avatar_url, created_at, last_used_at 
              FROM accounts WHERE network = ?1 AND is_default = 1"
@@ -255,10 +255,8 @@ impl Database {
     /// Set an account as the default for its network
     pub fn set_default_account(&self, id: Uuid, _network: Network) -> Result<()> {
         // Unset ALL current defaults (only one default across all networks)
-        self.conn.execute(
-            "UPDATE accounts SET is_default = 0",
-            params![],
-        )?;
+        self.conn
+            .execute("UPDATE accounts SET is_default = 0", params![])?;
 
         // Set new default
         self.conn.execute(
@@ -286,12 +284,12 @@ impl Database {
         let media_json = serde_json::to_string(&post.media).unwrap_or_else(|_| "[]".to_string());
 
         self.conn.execute(
-            r#"INSERT OR REPLACE INTO post_cache 
+            r"INSERT OR REPLACE INTO post_cache 
                (id, network_id, network, author_handle, author_name, author_avatar, 
                 content, content_raw, created_at, url, is_repost, repost_author,
                 like_count, repost_count, reply_count, liked, reposted, reply_to_id,
                 cid, uri, media_json, cached_at)
-               VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22)"#,
+               VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22)",
             params![
                 post.id.to_string(),
                 post.network_id,
@@ -303,13 +301,13 @@ impl Database {
                 post.content_raw,
                 post.created_at.to_rfc3339(),
                 post.url,
-                post.is_repost as i32,
+                i32::from(post.is_repost),
                 post.repost_author,
                 post.like_count,
                 post.repost_count,
                 post.reply_count,
-                post.liked as i32,
-                post.reposted as i32,
+                i32::from(post.liked),
+                i32::from(post.reposted),
                 post.reply_to_id,
                 post.cid,
                 post.uri,
@@ -323,14 +321,13 @@ impl Database {
     /// Get cached posts for a network (most recent first)
     pub fn get_cached_posts(&self, network: Option<Network>, limit: usize) -> Result<Vec<Post>> {
         let sql = if let Some(net) = network {
-            let network_str = format!("{:?}", net).to_lowercase();
+            let network_str = format!("{net:?}").to_lowercase();
             format!(
                 "SELECT id, network_id, network, author_handle, author_name, author_avatar,
                         content, content_raw, created_at, url, is_repost, repost_author,
                         like_count, repost_count, reply_count, liked, reposted, reply_to_id,
                         cid, uri, media_json
-                 FROM post_cache WHERE network = '{}' ORDER BY created_at DESC LIMIT {}",
-                network_str, limit
+                 FROM post_cache WHERE network = '{network_str}' ORDER BY created_at DESC LIMIT {limit}"
             )
         } else {
             format!(
@@ -338,8 +335,7 @@ impl Database {
                         content, content_raw, created_at, url, is_repost, repost_author,
                         like_count, repost_count, reply_count, liked, reposted, reply_to_id,
                         cid, uri, media_json
-                 FROM post_cache ORDER BY created_at DESC LIMIT {}",
-                limit
+                 FROM post_cache ORDER BY created_at DESC LIMIT {limit}"
             )
         };
 
@@ -348,10 +344,13 @@ impl Database {
         let posts = stmt.query_map([], |row| {
             let network_str: String = row.get(2)?;
             let network = Network::from_str(&network_str).unwrap_or_default();
-            
+
             // Deserialize media from JSON
-            let media_json: String = row.get::<_, Option<String>>(20)?.unwrap_or_else(|| "[]".to_string());
-            let media: Vec<crate::models::MediaAttachment> = serde_json::from_str(&media_json).unwrap_or_default();
+            let media_json: String = row
+                .get::<_, Option<String>>(20)?
+                .unwrap_or_else(|| "[]".to_string());
+            let media: Vec<crate::models::MediaAttachment> =
+                serde_json::from_str(&media_json).unwrap_or_default();
 
             Ok(Post {
                 id: Uuid::parse_str(&row.get::<_, String>(0)?).unwrap(),

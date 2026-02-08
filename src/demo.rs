@@ -36,7 +36,7 @@ pub fn demo_accounts() -> Vec<Account> {
 /// Generate demo posts
 pub fn demo_posts() -> Vec<Post> {
     let now = Utc::now();
-    
+
     vec![
         Post {
             id: Uuid::new_v4(),

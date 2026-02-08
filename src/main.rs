@@ -70,7 +70,7 @@ fn parse_args() -> Result<Command> {
         "-h" | "--help" | "help" => Ok(Command::Help),
         "-v" | "--version" | "version" => Ok(Command::Version),
         "--demo" | "demo" => Ok(Command::Demo),
-        
+
         "auth" => {
             let network = args
                 .get(2)
@@ -79,13 +79,13 @@ fn parse_args() -> Result<Command> {
             let instance = args.get(3).cloned();
             Ok(Command::Auth { network, instance })
         }
-        
+
         "post" => {
             let content = args
                 .get(2)
                 .ok_or_else(|| anyhow::anyhow!("Missing post content"))?
                 .clone();
-            
+
             // Parse --to flag
             let mut networks = Vec::new();
             let mut i = 3;
@@ -99,15 +99,15 @@ fn parse_args() -> Result<Command> {
                     i += 1;
                 }
             }
-            
+
             // Default to all configured networks
             if networks.is_empty() {
                 networks = vec!["mastodon".to_string(), "bluesky".to_string()];
             }
-            
+
             Ok(Command::Post { content, networks })
         }
-        
+
         "timeline" | "tl" => {
             let network = args.get(2).cloned();
             let limit = args
@@ -118,9 +118,9 @@ fn parse_args() -> Result<Command> {
                 .unwrap_or(20);
             Ok(Command::Timeline { network, limit })
         }
-        
+
         "accounts" => Ok(Command::Accounts),
-        
+
         other => Err(anyhow::anyhow!(
             "Unknown command: {other}\nRun 'perch --help' for usage"
         )),
@@ -215,34 +215,34 @@ async fn auth_flow(network: &str, instance: Option<&str>) -> Result<()> {
             let instance = instance.ok_or_else(|| {
                 anyhow::anyhow!("Mastodon requires an instance URL\nExample: perch auth mastodon mastodon.social")
             })?;
-            
+
             let instance = if instance.starts_with("http") {
                 instance.to_string()
             } else {
                 format!("https://{}", instance)
             };
-            
+
             println!("🐘 Authenticating with Mastodon ({})...", instance);
-            
+
             // Register app
             let app = perch::api::mastodon::oauth::register_app(&instance).await?;
             println!("✓ App registered");
-            
+
             // Store client credentials
             perch::auth::store_oauth_client(&instance, &app.client_id, &app.client_secret)?;
-            
+
             // Get auth URL
             let auth_url = perch::api::mastodon::oauth::get_auth_url(&instance, &app.client_id);
             println!("\n📋 Open this URL in your browser:\n\n  {}\n", auth_url);
-            
+
             // Try to open browser
             let _ = open::that(&auth_url);
-            
+
             println!("Paste the authorization code here:");
             let mut code = String::new();
             std::io::stdin().read_line(&mut code)?;
             let code = code.trim();
-            
+
             // Exchange for token
             let token = perch::api::mastodon::oauth::get_token(
                 &instance,
@@ -251,11 +251,11 @@ async fn auth_flow(network: &str, instance: Option<&str>) -> Result<()> {
                 code,
             )
             .await?;
-            
+
             // Verify and get account info
             let client = perch::api::mastodon::MastodonClient::new(&instance, &token.access_token);
             let account_info = client.verify_credentials().await?;
-            
+
             // Create and store account
             let mut account = perch::Account::new_mastodon(
                 &account_info.handle,
@@ -263,24 +263,24 @@ async fn auth_flow(network: &str, instance: Option<&str>) -> Result<()> {
                 &account_info.display_name,
             );
             account.avatar_url = account_info.avatar_url;
-            
+
             let db = perch::Database::open()?;
             db.insert_account(&account)?;
-            
+
             // Store token
             perch::auth::store_credentials(&account, &token.access_token)?;
-            
+
             println!("\n✓ Logged in as @{}", account_info.handle);
             println!("✓ Account saved");
         }
-        
+
         "bluesky" | "bsky" => {
             println!("🦋 Authenticating with Bluesky...");
             println!("\nEnter your handle (e.g., you.bsky.social):");
             let mut handle = String::new();
             std::io::stdin().read_line(&mut handle)?;
             let handle = handle.trim();
-            
+
             // Ask for PDS URL (optional)
             println!("\nEnter your PDS URL (press Enter for default bsky.social):");
             let mut pds_input = String::new();
@@ -293,17 +293,19 @@ async fn auth_flow(network: &str, instance: Option<&str>) -> Result<()> {
             } else {
                 &format!("https://{}", pds_url)
             };
-            
+
             println!("\nEnter your app password:");
             println!("(Create one at https://bsky.app/settings/app-passwords)");
             let mut password = String::new();
             std::io::stdin().read_line(&mut password)?;
             let password = password.trim();
-            
+
             // Login and verify
-            let client = perch::api::bluesky::BlueskyClient::login_with_pds(handle, password, pds_url).await?;
+            let client =
+                perch::api::bluesky::BlueskyClient::login_with_pds(handle, password, pds_url)
+                    .await?;
             let account_info = client.verify_credentials().await?;
-            
+
             // Create and store account with the actual PDS URL
             let mut account = perch::Account::new_bluesky_with_pds(
                 &account_info.handle,
@@ -311,17 +313,17 @@ async fn auth_flow(network: &str, instance: Option<&str>) -> Result<()> {
                 pds_url,
             );
             account.avatar_url = account_info.avatar_url;
-            
+
             let db = perch::Database::open()?;
             db.insert_account(&account)?;
-            
+
             // Store app password
             perch::auth::store_credentials(&account, password)?;
-            
+
             println!("\n✓ Logged in as @{}", account_info.handle);
             println!("✓ Account saved (PDS: {})", pds_url);
         }
-        
+
         _ => {
             return Err(anyhow::anyhow!(
                 "Unknown network: {}\nSupported: mastodon, bluesky",
@@ -329,71 +331,78 @@ async fn auth_flow(network: &str, instance: Option<&str>) -> Result<()> {
             ));
         }
     }
-    
+
     Ok(())
 }
 
 async fn post_cli(content: &str, networks: &[String]) -> Result<()> {
     let db = perch::Database::open()?;
-    
+
     for network_name in networks {
         let network = perch::Network::from_str(network_name)
             .ok_or_else(|| anyhow::anyhow!("Unknown network: {}", network_name))?;
-        
-        let account = db
-            .get_default_account(network)?
-            .ok_or_else(|| anyhow::anyhow!("No {} account configured. Run: perch auth {}", network.name(), network_name))?;
-        
+
+        let account = db.get_default_account(network)?.ok_or_else(|| {
+            anyhow::anyhow!(
+                "No {} account configured. Run: perch auth {}",
+                network.name(),
+                network_name
+            )
+        })?;
+
         let token = perch::auth::get_credentials(&account)?
             .ok_or_else(|| anyhow::anyhow!("No credentials found for {}", account.handle))?;
-        
+
         let client = perch::api::get_client(&account, &token).await?;
-        
+
         println!("{} Posting to {}...", network.emoji(), network.name());
         let post = client.post(content).await?;
-        
+
         if let Some(url) = &post.url {
             println!("✓ Posted: {}", url);
         } else {
             println!("✓ Posted successfully");
         }
     }
-    
+
     Ok(())
 }
 
 async fn timeline_cli(network: Option<&str>, limit: usize) -> Result<()> {
     let db = perch::Database::open()?;
-    
+
     let networks: Vec<perch::Network> = if let Some(name) = network {
-        vec![perch::Network::from_str(name)
-            .ok_or_else(|| anyhow::anyhow!("Unknown network: {}", name))?]
+        vec![
+            perch::Network::from_str(name)
+                .ok_or_else(|| anyhow::anyhow!("Unknown network: {}", name))?,
+        ]
     } else {
         perch::Network::all().to_vec()
     };
-    
+
     for network in networks {
         let Some(account) = db.get_default_account(network)? else {
             continue;
         };
-        
+
         let Some(token) = perch::auth::get_credentials(&account)? else {
             continue;
         };
-        
+
         let client = perch::api::get_client(&account, &token).await?;
-        
-        println!("\n{} {} Timeline (@{})", network.emoji(), network.name(), account.handle);
+
+        println!(
+            "\n{} {} Timeline (@{})",
+            network.emoji(),
+            network.name(),
+            account.handle
+        );
         println!("{}", "─".repeat(60));
-        
+
         let posts = client.timeline(limit).await?;
-        
+
         for post in posts {
-            println!(
-                "\n@{} · {}",
-                post.author_handle,
-                post.relative_time()
-            );
+            println!("\n@{} · {}", post.author_handle, post.relative_time());
             println!("{}", post.content);
             println!(
                 "♥ {}  🔁 {}  💬 {}",
@@ -401,14 +410,14 @@ async fn timeline_cli(network: Option<&str>, limit: usize) -> Result<()> {
             );
         }
     }
-    
+
     Ok(())
 }
 
 fn list_accounts() -> Result<()> {
     let db = perch::Database::open()?;
     let accounts = db.get_accounts()?;
-    
+
     if accounts.is_empty() {
         println!("No accounts configured.");
         println!("\nAdd an account with:");
@@ -416,14 +425,18 @@ fn list_accounts() -> Result<()> {
         println!("  perch auth bluesky");
         return Ok(());
     }
-    
+
     println!("Configured accounts:\n");
-    
+
     for account in accounts {
         let default_marker = if account.is_default { " (default)" } else { "" };
         let has_creds = perch::auth::has_credentials(&account);
-        let cred_status = if has_creds { "✓" } else { "✗ no credentials" };
-        
+        let cred_status = if has_creds {
+            "✓"
+        } else {
+            "✗ no credentials"
+        };
+
         println!(
             "  {} {} @{}{}\n    Server: {}\n    Auth: {} (key: {})",
             account.network.emoji(),
@@ -435,6 +448,6 @@ fn list_accounts() -> Result<()> {
             account.keyring_key()
         );
     }
-    
+
     Ok(())
 }

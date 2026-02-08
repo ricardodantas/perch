@@ -43,19 +43,19 @@ fn default_timeline() -> String {
     "home".to_string()
 }
 
-fn default_vim_mode() -> bool {
+const fn default_vim_mode() -> bool {
     true
 }
 
-fn default_refresh_interval() -> u64 {
+const fn default_refresh_interval() -> u64 {
     0 // Manual refresh by default
 }
 
-fn default_post_limit() -> usize {
+const fn default_post_limit() -> usize {
     50
 }
 
-fn default_show_media() -> bool {
+const fn default_show_media() -> bool {
     true
 }
 

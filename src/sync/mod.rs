@@ -72,7 +72,7 @@ impl SyncManager {
 
         loop {
             interval.tick().await;
-            
+
             if let Err(e) = self.refresh_all().await {
                 tracing::error!("Background refresh failed: {}", e);
             }

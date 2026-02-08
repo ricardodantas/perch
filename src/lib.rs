@@ -44,7 +44,7 @@
 //! - [`app`] — TUI application state and event loop
 //! - [`auth`] — Credential storage via system keyring
 //! - [`config`] — Configuration management
-//! - [`db`] — SQLite database for accounts, cache, drafts
+//! - [`db`] — `SQLite` database for accounts, cache, drafts
 //! - [`models`] — Data models (Post, Account, Network)
 //! - [`theme`] — Theme support via ratatui-themes
 //!
@@ -75,6 +75,27 @@
 #![allow(clippy::missing_panics_doc)]
 #![allow(clippy::must_use_candidate)]
 #![allow(clippy::module_name_repetitions)]
+#![allow(clippy::items_after_statements)]
+#![allow(clippy::option_if_let_else)]
+#![allow(clippy::if_not_else)]
+#![allow(clippy::single_match_else)]
+#![allow(clippy::too_many_lines)]
+#![allow(clippy::trivially_copy_pass_by_ref)]
+#![allow(clippy::match_same_arms)]
+#![allow(clippy::use_self)]
+#![allow(clippy::uninlined_format_args)]
+#![allow(clippy::cast_possible_truncation)]
+#![allow(clippy::cast_sign_loss)]
+#![allow(clippy::cast_possible_wrap)]
+#![allow(clippy::needless_pass_by_value)]
+#![allow(clippy::should_implement_trait)]
+#![allow(clippy::struct_excessive_bools)]
+#![allow(clippy::similar_names)]
+#![allow(clippy::if_same_then_else)]
+#![allow(clippy::manual_let_else)]
+#![allow(clippy::branches_sharing_code)]
+#![allow(clippy::wrong_self_convention)]
+#![allow(clippy::return_self_not_must_use)]
 
 pub mod api;
 pub mod app;
@@ -94,18 +115,20 @@ pub use config::Config;
 pub use db::Database;
 pub use models::{Account, Network, Post};
 pub use theme::{Theme, ThemeColors};
-pub use update::{PackageManager, VersionCheck, check_for_updates_crates_io, detect_package_manager, run_update};
+pub use update::{
+    PackageManager, VersionCheck, check_for_updates_crates_io, detect_package_manager, run_update,
+};
 
 // Re-export theme types from ratatui-themes crate
 pub use ratatui_themes::{ThemeName, ThemePalette};
 
 /// ASCII logo for the application
-pub const LOGO: &str = r#"
+pub const LOGO: &str = r"
     ___                 __  
    / _ \___ _______/ /  
   / ___/ -_) __/ __/ _ \ 
  /_/   \__/_/  \__/_//_/ 
-"#;
+";
 
 /// Application version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

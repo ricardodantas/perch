@@ -30,7 +30,7 @@ pub enum FocusedPanel {
 
 impl FocusedPanel {
     /// Get the next panel in tab order (for Timeline view: Timeline <-> Detail)
-    pub fn next(&self) -> Self {
+    pub const fn next(&self) -> Self {
         match self {
             Self::Accounts => Self::Timeline,
             Self::Timeline => Self::Detail,
@@ -39,7 +39,7 @@ impl FocusedPanel {
     }
 
     /// Get the previous panel in tab order
-    pub fn prev(&self) -> Self {
+    pub const fn prev(&self) -> Self {
         match self {
             Self::Accounts => Self::Detail,
             Self::Timeline => Self::Detail,
@@ -88,7 +88,7 @@ pub enum TimelineFilter {
 }
 
 impl TimelineFilter {
-    pub fn next(&self) -> Self {
+    pub const fn next(&self) -> Self {
         match self {
             Self::All => Self::Mastodon,
             Self::Mastodon => Self::Bluesky,
@@ -96,7 +96,7 @@ impl TimelineFilter {
         }
     }
 
-    pub fn name(&self) -> &'static str {
+    pub const fn name(&self) -> &'static str {
         match self {
             Self::All => "All",
             Self::Mastodon => "Mastodon",
@@ -104,7 +104,7 @@ impl TimelineFilter {
         }
     }
 
-    pub fn to_network(&self) -> Option<Network> {
+    pub const fn to_network(&self) -> Option<Network> {
         match self {
             Self::All => None,
             Self::Mastodon => Some(Network::Mastodon),
@@ -174,7 +174,7 @@ pub struct AppState {
 
     /// Theme picker index
     pub theme_picker_index: usize,
-    
+
     /// Update available (version string if newer version exists)
     pub update_available: Option<String>,
     /// Package manager for updates
@@ -233,12 +233,12 @@ impl AppState {
     }
 
     /// Tick for animations
-    pub fn tick(&mut self) {
+    pub const fn tick(&mut self) {
         self.tick = self.tick.wrapping_add(1);
     }
 
     /// Get current tick
-    pub fn current_tick(&self) -> u64 {
+    pub const fn current_tick(&self) -> u64 {
         self.tick
     }
 
@@ -306,7 +306,7 @@ impl AppState {
     }
 
     /// Move selection up in accounts
-    pub fn select_prev_account(&mut self) {
+    pub const fn select_prev_account(&mut self) {
         self.selected_account = self.selected_account.saturating_sub(1);
     }
 
@@ -320,10 +320,10 @@ impl AppState {
     pub fn cycle_filter(&mut self) {
         self.timeline_filter = self.timeline_filter.next();
         // Reload posts with new filter
-        if let Ok(posts) = self.db.get_cached_posts(
-            self.timeline_filter.to_network(),
-            self.config.post_limit,
-        ) {
+        if let Ok(posts) = self
+            .db
+            .get_cached_posts(self.timeline_filter.to_network(), self.config.post_limit)
+        {
             self.posts = posts;
             self.selected_post = 0;
         }
@@ -332,10 +332,9 @@ impl AppState {
     /// Refresh data from database
     pub fn refresh_data(&mut self) -> Result<()> {
         self.accounts = self.db.get_accounts()?;
-        self.posts = self.db.get_cached_posts(
-            self.timeline_filter.to_network(),
-            self.config.post_limit,
-        )?;
+        self.posts = self
+            .db
+            .get_cached_posts(self.timeline_filter.to_network(), self.config.post_limit)?;
         Ok(())
     }
 
@@ -345,7 +344,8 @@ impl AppState {
         self.compose_text.clear();
         self.reply_to = None;
         // Pre-select networks based on configured accounts
-        self.compose_networks = self.accounts
+        self.compose_networks = self
+            .accounts
             .iter()
             .map(|a| a.network)
             .collect::<std::collections::HashSet<_>>()
@@ -378,7 +378,7 @@ impl AppState {
     }
 
     /// Navigate to the next view
-    pub fn next_view(&mut self) {
+    pub const fn next_view(&mut self) {
         self.view = match self.view {
             View::Timeline => View::Accounts,
             View::Accounts => View::Timeline,
@@ -386,7 +386,7 @@ impl AppState {
     }
 
     /// Navigate to the previous view
-    pub fn prev_view(&mut self) {
+    pub const fn prev_view(&mut self) {
         self.view = match self.view {
             View::Timeline => View::Accounts,
             View::Accounts => View::Timeline,

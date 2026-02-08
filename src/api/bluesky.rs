@@ -31,7 +31,7 @@ impl BlueskyClient {
         let client = Client::new();
         let pds_url = pds_url.trim_end_matches('/').to_string();
 
-        let url = format!("{}/xrpc/com.atproto.server.createSession", pds_url);
+        let url = format!("{pds_url}/xrpc/com.atproto.server.createSession");
 
         let request = CreateSessionRequest {
             identifier: handle.to_string(),
@@ -47,7 +47,7 @@ impl BlueskyClient {
 
         if !response.status().is_success() {
             let error_text = response.text().await.unwrap_or_default();
-            bail!("Bluesky login failed: {}", error_text);
+            bail!("Bluesky login failed: {error_text}");
         }
 
         let session: CreateSessionResponse = response
@@ -91,7 +91,7 @@ impl SocialApi for BlueskyClient {
 
         if !response.status().is_success() {
             let error_text = response.text().await.unwrap_or_default();
-            bail!("Failed to fetch timeline: {}", error_text);
+            bail!("Failed to fetch timeline: {error_text}");
         }
 
         let timeline: GetTimelineResponse = response
@@ -102,13 +102,13 @@ impl SocialApi for BlueskyClient {
         Ok(timeline
             .feed
             .into_iter()
-            .map(|item| item.into_post())
+            .map(FeedViewPost::into_post)
             .collect())
     }
 
     async fn get_context(&self, post: &Post) -> Result<Vec<Post>> {
         let uri = post.uri.as_ref().context("Post missing URI for context")?;
-        
+
         let url = format!(
             "{}/xrpc/app.bsky.feed.getPostThread?uri={}&depth=10",
             self.pds_url,
@@ -125,7 +125,7 @@ impl SocialApi for BlueskyClient {
 
         if !response.status().is_success() {
             let error_text = response.text().await.unwrap_or_default();
-            bail!("Failed to fetch thread: {}", error_text);
+            bail!("Failed to fetch thread: {error_text}");
         }
 
         // Thread response is complex - for now return empty
@@ -161,7 +161,7 @@ impl SocialApi for BlueskyClient {
 
         if !response.status().is_success() {
             let error_text = response.text().await.unwrap_or_default();
-            bail!("Failed to post: {}", error_text);
+            bail!("Failed to post: {error_text}");
         }
 
         let result: CreateRecordResponse = response
@@ -172,7 +172,12 @@ impl SocialApi for BlueskyClient {
         // Return a simple post object
         Ok(Post {
             id: uuid::Uuid::new_v4(),
-            network_id: result.uri.split('/').last().unwrap_or(&result.uri).to_string(),
+            network_id: result
+                .uri
+                .split('/')
+                .next_back()
+                .unwrap_or(&result.uri)
+                .to_string(),
             network: Network::Bluesky,
             author_handle: self.did.clone(),
             author_name: String::new(),
@@ -199,7 +204,7 @@ impl SocialApi for BlueskyClient {
         // For Bluesky replies, we need the parent post's URI and CID
         // For now, we'll construct the URI from the reply_to_id
         // Full implementation would need to fetch the parent post first
-        
+
         let url = format!("{}/xrpc/com.atproto.repo.createRecord", self.pds_url);
         let now = Utc::now().format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string();
 
@@ -207,7 +212,7 @@ impl SocialApi for BlueskyClient {
         // We need to construct the full URI: at://did/app.bsky.feed.post/rkey
         // For simplicity, just post without reply threading for now
         // TODO: Implement proper reply threading by fetching parent post
-        
+
         let record = PostRecord {
             text: content.to_string(),
             created_at: now.clone(),
@@ -231,7 +236,7 @@ impl SocialApi for BlueskyClient {
 
         if !response.status().is_success() {
             let error_text = response.text().await.unwrap_or_default();
-            bail!("Failed to post reply: {}", error_text);
+            bail!("Failed to post reply: {error_text}");
         }
 
         let result: CreateRecordResponse = response
@@ -241,7 +246,12 @@ impl SocialApi for BlueskyClient {
 
         Ok(Post {
             id: uuid::Uuid::new_v4(),
-            network_id: result.uri.split('/').last().unwrap_or(&result.uri).to_string(),
+            network_id: result
+                .uri
+                .split('/')
+                .next_back()
+                .unwrap_or(&result.uri)
+                .to_string(),
             network: Network::Bluesky,
             author_handle: self.did.clone(),
             author_name: String::new(),
@@ -298,7 +308,7 @@ impl SocialApi for BlueskyClient {
 
         if !response.status().is_success() {
             let error_text = response.text().await.unwrap_or_default();
-            bail!("Failed to like post: {}", error_text);
+            bail!("Failed to like post: {error_text}");
         }
 
         Ok(())
@@ -306,14 +316,14 @@ impl SocialApi for BlueskyClient {
 
     async fn unlike(&self, post: &Post) -> Result<()> {
         let uri = post.uri.as_ref().context("Post missing URI for unlike")?;
-        
+
         // First, find the like record
         let list_url = format!(
             "{}/xrpc/app.bsky.feed.getLikes?uri={}&limit=100",
             self.pds_url,
             urlencoding::encode(uri)
         );
-        
+
         let response = self
             .client
             .get(&list_url)
@@ -321,18 +331,18 @@ impl SocialApi for BlueskyClient {
             .send()
             .await
             .context("Failed to get likes")?;
-        
+
         if !response.status().is_success() {
             let error_text = response.text().await.unwrap_or_default();
-            bail!("Failed to get likes: {}", error_text);
+            bail!("Failed to get likes: {error_text}");
         }
-        
+
         #[derive(Debug, Deserialize)]
         #[allow(dead_code)]
         struct LikesResponse {
             likes: Vec<LikeItem>,
         }
-        
+
         #[derive(Debug, Deserialize)]
         #[allow(dead_code)]
         struct LikeItem {
@@ -340,15 +350,15 @@ impl SocialApi for BlueskyClient {
             #[serde(rename = "indexedAt")]
             _indexed_at: String,
         }
-        
+
         let _likes: LikesResponse = response.json().await.context("Failed to parse likes")?;
-        
+
         // Find our like in the actor's repo
         let records_url = format!(
             "{}/xrpc/com.atproto.repo.listRecords?repo={}&collection=app.bsky.feed.like&limit=100",
             self.pds_url, self.did
         );
-        
+
         let response = self
             .client
             .get(&records_url)
@@ -356,62 +366,67 @@ impl SocialApi for BlueskyClient {
             .send()
             .await
             .context("Failed to list like records")?;
-        
+
         if !response.status().is_success() {
             let error_text = response.text().await.unwrap_or_default();
-            bail!("Failed to list like records: {}", error_text);
+            bail!("Failed to list like records: {error_text}");
         }
-        
+
         #[derive(Debug, Deserialize)]
         struct ListRecordsResponse {
             records: Vec<RecordItem>,
         }
-        
+
         #[derive(Debug, Deserialize)]
         struct RecordItem {
             uri: String,
             value: LikeRecordValue,
         }
-        
+
         #[derive(Debug, Deserialize)]
         struct LikeRecordValue {
             subject: RecordRef,
         }
-        
+
         #[derive(Debug, Deserialize)]
         struct RecordRef {
             uri: String,
         }
-        
-        let records: ListRecordsResponse = response.json().await.context("Failed to parse records")?;
-        
+
+        let records: ListRecordsResponse =
+            response.json().await.context("Failed to parse records")?;
+
         // Find the like record for this post
         let like_record = records.records.iter().find(|r| r.value.subject.uri == *uri);
-        
+
         let Some(record) = like_record else {
             // Already unliked or not found
             return Ok(());
         };
-        
+
         // Extract rkey from the record URI
-        let rkey = record.uri.split('/').last().context("Invalid record URI")?;
-        
+        let rkey = record
+            .uri
+            .split('/')
+            .next_back()
+            .context("Invalid record URI")?;
+
         // Delete the like record
         let delete_url = format!("{}/xrpc/com.atproto.repo.deleteRecord", self.pds_url);
-        
+
         #[derive(Debug, Serialize)]
         struct DeleteRequest {
             repo: String,
             collection: String,
             rkey: String,
         }
-        
+
         let delete_request = DeleteRequest {
             repo: self.did.clone(),
             collection: "app.bsky.feed.like".to_string(),
             rkey: rkey.to_string(),
         };
-        
+
         let response = self
             .client
             .post(&delete_url)
@@ -420,12 +435,12 @@ impl SocialApi for BlueskyClient {
             .send()
             .await
             .context("Failed to delete like")?;
-        
+
         if !response.status().is_success() {
             let error_text = response.text().await.unwrap_or_default();
-            bail!("Failed to unlike: {}", error_text);
+            bail!("Failed to unlike: {error_text}");
         }
-        
+
         Ok(())
     }
 
@@ -463,7 +478,7 @@ impl SocialApi for BlueskyClient {
 
         if !response.status().is_success() {
             let error_text = response.text().await.unwrap_or_default();
-            bail!("Failed to repost: {}", error_text);
+            bail!("Failed to repost: {error_text}");
         }
 
         Ok(())
@@ -471,13 +486,13 @@ impl SocialApi for BlueskyClient {
 
     async fn unrepost(&self, post: &Post) -> Result<()> {
         let uri = post.uri.as_ref().context("Post missing URI for unrepost")?;
-        
+
         // Find the repost record in the actor's repo
         let records_url = format!(
             "{}/xrpc/com.atproto.repo.listRecords?repo={}&collection=app.bsky.feed.repost&limit=100",
             self.pds_url, self.did
         );
-        
+
         let response = self
             .client
             .get(&records_url)
@@ -485,62 +500,67 @@ impl SocialApi for BlueskyClient {
             .send()
             .await
             .context("Failed to list repost records")?;
-        
+
         if !response.status().is_success() {
             let error_text = response.text().await.unwrap_or_default();
-            bail!("Failed to list repost records: {}", error_text);
+            bail!("Failed to list repost records: {error_text}");
         }
-        
+
         #[derive(Debug, Deserialize)]
         struct ListRecordsResponse {
             records: Vec<RecordItem>,
         }
-        
+
         #[derive(Debug, Deserialize)]
         struct RecordItem {
             uri: String,
             value: RepostRecordValue,
         }
-        
+
         #[derive(Debug, Deserialize)]
         struct RepostRecordValue {
             subject: RecordRef,
         }
-        
+
         #[derive(Debug, Deserialize)]
         struct RecordRef {
             uri: String,
         }
-        
-        let records: ListRecordsResponse = response.json().await.context("Failed to parse records")?;
-        
+
+        let records: ListRecordsResponse =
+            response.json().await.context("Failed to parse records")?;
+
         // Find the repost record for this post
         let repost_record = records.records.iter().find(|r| r.value.subject.uri == *uri);
-        
+
         let Some(record) = repost_record else {
             // Already unreposted or not found
             return Ok(());
         };
-        
+
         // Extract rkey from the record URI
-        let rkey = record.uri.split('/').last().context("Invalid record URI")?;
-        
+        let rkey = record
+            .uri
+            .split('/')
+            .next_back()
+            .context("Invalid record URI")?;
+
         // Delete the repost record
         let delete_url = format!("{}/xrpc/com.atproto.repo.deleteRecord", self.pds_url);
-        
+
         #[derive(Debug, Serialize)]
         struct DeleteRequest {
             repo: String,
             collection: String,
             rkey: String,
         }
-        
+
         let delete_request = DeleteRequest {
             repo: self.did.clone(),
             collection: "app.bsky.feed.repost".to_string(),
             rkey: rkey.to_string(),
         };
-        
+
         let response = self
             .client
             .post(&delete_url)
@@ -549,12 +569,12 @@ impl SocialApi for BlueskyClient {
             .send()
             .await
             .context("Failed to delete repost")?;
-        
+
         if !response.status().is_success() {
             let error_text = response.text().await.unwrap_or_default();
-            bail!("Failed to unrepost: {}", error_text);
+            bail!("Failed to unrepost: {error_text}");
         }
-        
+
         Ok(())
     }
 
@@ -580,7 +600,9 @@ impl SocialApi for BlueskyClient {
         Ok(Account {
             id: uuid::Uuid::new_v4(),
             network: Network::Bluesky,
-            display_name: profile.display_name.unwrap_or_else(|| profile.handle.clone()),
+            display_name: profile
+                .display_name
+                .unwrap_or_else(|| profile.handle.clone()),
             handle: profile.handle,
             server: self.pds_url.clone(),
             is_default: true, // First account of this network is default
@@ -752,8 +774,7 @@ impl FeedViewPost {
     fn into_post(self) -> Post {
         let created_at = DateTime::parse_from_rfc3339(&self.post.record.created_at)
             .or_else(|_| DateTime::parse_from_rfc3339(&self.post.indexed_at))
-            .map(|dt| dt.with_timezone(&Utc))
-            .unwrap_or_else(|_| Utc::now());
+            .map_or_else(|_| Utc::now(), |dt| dt.with_timezone(&Utc));
 
         let (is_repost, repost_author) = if let Some(reason) = &self.reason {
             if reason.reason_type == "app.bsky.feed.defs#reasonRepost" {
@@ -795,17 +816,25 @@ impl FeedViewPost {
         let url = format!(
             "https://bsky.app/profile/{}/post/{}",
             self.post.author.handle,
-            self.post.uri.split('/').last().unwrap_or("")
+            self.post.uri.split('/').next_back().unwrap_or("")
         );
 
         // Check viewer state for liked/reposted
-        let (liked, reposted) = self.post.viewer.as_ref().map_or((false, false), |v| {
-            (v.like.is_some(), v.repost.is_some())
-        });
+        let (liked, reposted) = self
+            .post
+            .viewer
+            .as_ref()
+            .map_or((false, false), |v| (v.like.is_some(), v.repost.is_some()));
 
         Post {
             id: uuid::Uuid::new_v4(),
-            network_id: self.post.uri.split('/').last().unwrap_or(&self.post.uri).to_string(),
+            network_id: self
+                .post
+                .uri
+                .split('/')
+                .next_back()
+                .unwrap_or(&self.post.uri)
+                .to_string(),
             network: Network::Bluesky,
             author_handle: self.post.author.handle,
             author_name: self.post.author.display_name.unwrap_or_default(),

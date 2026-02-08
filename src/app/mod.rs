@@ -49,23 +49,25 @@ pub fn run() -> Result<()> {
     terminal.clear()?;
 
     // Create app state
-    let mut state = AppState::new(config.clone(), db)?;
+    let mut state = AppState::new(config, db)?;
 
     // Trigger initial refresh if we have accounts
     if !state.accounts.is_empty() {
-        let _ = async_handle.cmd_tx.blocking_send(AsyncCommand::RefreshTimeline {
-            accounts: state.accounts.clone(),
-        });
+        let _ = async_handle
+            .cmd_tx
+            .blocking_send(AsyncCommand::RefreshTimeline {
+                accounts: state.accounts.clone(),
+            });
         state.loading = true;
         state.set_status("Loading timeline...");
     }
 
     // Spawn background update check
     std::thread::spawn(|| {
-        if let crate::VersionCheck::UpdateAvailable { latest, .. } = 
-            crate::check_for_updates_crates_io() 
+        if let crate::VersionCheck::UpdateAvailable { latest, .. } =
+            crate::check_for_updates_crates_io()
         {
-            // We can't easily send to main thread without channels, 
+            // We can't easily send to main thread without channels,
             // but we can use a static or file. For simplicity, we'll check in the main loop.
             // This thread just warms up the check.
             let _ = latest;
@@ -96,11 +98,11 @@ fn run_app(
 ) -> Result<()> {
     // Channel for background messages
     let (bg_tx, bg_rx) = std::sync::mpsc::channel::<BackgroundMsg>();
-    
+
     // Spawn background update check
     std::thread::spawn(move || {
-        if let crate::VersionCheck::UpdateAvailable { latest, .. } = 
-            crate::check_for_updates_crates_io() 
+        if let crate::VersionCheck::UpdateAvailable { latest, .. } =
+            crate::check_for_updates_crates_io()
         {
             let _ = bg_tx.send(BackgroundMsg::UpdateAvailable(latest));
         }
@@ -131,12 +133,11 @@ fn run_app(
         terminal.draw(|frame| ui::render(frame, state))?;
 
         // Handle events
-        if event::poll(Duration::from_millis(50))? {
-            if let Event::Key(key) = event::read()? {
-                if let Some(cmd) = events::handle_key(state, key) {
-                    let _ = async_handle.cmd_tx.blocking_send(cmd);
-                }
-            }
+        if event::poll(Duration::from_millis(50))?
+            && let Event::Key(key) = event::read()?
+            && let Some(cmd) = events::handle_key(state, key)
+        {
+            let _ = async_handle.cmd_tx.blocking_send(cmd);
         }
 
         // Tick for animations
@@ -167,7 +168,10 @@ fn handle_async_result(state: &mut AppState, result: AsyncResult) {
             state.loading = false;
             state.set_status(format!("Loaded {} posts", state.posts.len()));
         }
-        AsyncResult::ContextFetched { post_id: _, replies } => {
+        AsyncResult::ContextFetched {
+            post_id: _,
+            replies,
+        } => {
             state.current_replies = replies;
             state.loading_replies = false;
         }
@@ -206,7 +210,7 @@ fn handle_async_result(state: &mut AppState, result: AsyncResult) {
             state.loading = false;
         }
         AsyncResult::Error { message } => {
-            state.set_status(format!("❌ {}", message));
+            state.set_status(format!("❌ {message}"));
             state.loading = false;
         }
         AsyncResult::Status { message } => {
@@ -232,11 +236,14 @@ pub fn run_demo() -> Result<()> {
     terminal.clear()?;
 
     // Create app state with demo data
-    let mut state = AppState::new(config.clone(), db)?;
+    let mut state = AppState::new(config, db)?;
     state.accounts = demo::demo_accounts();
     state.posts = demo::demo_posts();
     state.focused_panel = state::FocusedPanel::Timeline;
-    state.set_status(format!("Demo mode | {} posts | Press ? for help | q to quit", state.posts.len()));
+    state.set_status(format!(
+        "Demo mode | {} posts | Press ? for help | q to quit",
+        state.posts.len()
+    ));
 
     // Main loop (simpler, no async)
     loop {
@@ -244,11 +251,11 @@ pub fn run_demo() -> Result<()> {
         terminal.draw(|frame| ui::render(frame, &state))?;
 
         // Handle events
-        if event::poll(Duration::from_millis(50))? {
-            if let Event::Key(key) = event::read()? {
-                // Simple event handling for demo
-                events::handle_key(&mut state, key);
-            }
+        if event::poll(Duration::from_millis(50))?
+            && let Event::Key(key) = event::read()?
+        {
+            // Simple event handling for demo
+            events::handle_key(&mut state, key);
         }
 
         // Tick for animations

@@ -21,7 +21,7 @@ pub fn process_pending_update(state: &mut AppState) {
             state.update_available = None;
         }
         Err(e) => {
-            state.update_status = Some(format!("Update failed: {}", e));
+            state.update_status = Some(format!("Update failed: {e}"));
         }
     }
     state.mode = Mode::Normal;
@@ -68,7 +68,7 @@ pub fn handle_key(state: &mut AppState, key: KeyEvent) -> Option<AsyncCommand> {
             state.should_quit = true;
             return None;
         }
-        (_, KeyCode::Char('?')) | (_, KeyCode::F(1)) => {
+        (_, KeyCode::Char('?') | KeyCode::F(1)) => {
             state.mode = Mode::Help;
             return None;
         }
@@ -104,7 +104,7 @@ pub fn handle_key(state: &mut AppState, key: KeyEvent) -> Option<AsyncCommand> {
             return None;
         }
         // Update (when available)
-        (_, KeyCode::Char('u')) | (_, KeyCode::Char('U')) => {
+        (_, KeyCode::Char('u' | 'U')) => {
             if state.update_available.is_some() {
                 state.mode = Mode::UpdateConfirm;
             }
@@ -123,11 +123,11 @@ pub fn handle_key(state: &mut AppState, key: KeyEvent) -> Option<AsyncCommand> {
 fn handle_timeline_key(state: &mut AppState, key: KeyEvent) -> Option<AsyncCommand> {
     match (key.modifiers, key.code) {
         // Panel navigation (when in timeline view)
-        (_, KeyCode::Left) | (_, KeyCode::Char('h')) => {
+        (_, KeyCode::Left | KeyCode::Char('h')) => {
             state.focused_panel = state.focused_panel.prev();
             None
         }
-        (_, KeyCode::Right) | (_, KeyCode::Char('l')) => {
+        (_, KeyCode::Right | KeyCode::Char('l')) => {
             state.focused_panel = state.focused_panel.next();
             None
         }
@@ -158,10 +158,10 @@ fn handle_timeline_key(state: &mut AppState, key: KeyEvent) -> Option<AsyncComma
                 FocusedPanel::Timeline => {
                     state.select_next_post();
                     // Fetch replies for newly selected post
-                    if let Some(post) = state.selected_post().cloned() {
-                        if let Some(account) = find_account_for_post(state, &post) {
-                            return Some(AsyncCommand::FetchContext { post, account });
-                        }
+                    if let Some(post) = state.selected_post().cloned()
+                        && let Some(account) = find_account_for_post(state, &post)
+                    {
+                        return Some(AsyncCommand::FetchContext { post, account });
                     }
                     None
                 }
@@ -190,10 +190,10 @@ fn handle_timeline_key(state: &mut AppState, key: KeyEvent) -> Option<AsyncComma
                 FocusedPanel::Timeline => {
                     state.select_prev_post();
                     // Fetch replies for newly selected post
-                    if let Some(post) = state.selected_post().cloned() {
-                        if let Some(account) = find_account_for_post(state, &post) {
-                            return Some(AsyncCommand::FetchContext { post, account });
-                        }
+                    if let Some(post) = state.selected_post().cloned()
+                        && let Some(account) = find_account_for_post(state, &post)
+                    {
+                        return Some(AsyncCommand::FetchContext { post, account });
                     }
                     None
                 }
@@ -273,7 +273,7 @@ fn handle_timeline_key(state: &mut AppState, key: KeyEvent) -> Option<AsyncComma
                 // Reply to main post
                 state.selected_post().cloned()
             };
-            
+
             if let Some(post) = reply_target {
                 state.open_reply(post);
             }
@@ -281,28 +281,26 @@ fn handle_timeline_key(state: &mut AppState, key: KeyEvent) -> Option<AsyncComma
         }
         (_, KeyCode::Char('o')) => {
             // Open selected post in browser
-            if let Some(post) = state.selected_post() {
-                if let Some(url) = &post.url {
-                    let _ = open::that(url);
-                    state.set_status("✓ Opened in browser");
-                }
+            if let Some(post) = state.selected_post()
+                && let Some(url) = &post.url
+            {
+                let _ = open::that(url);
+                state.set_status("✓ Opened in browser");
             }
             None
         }
-        (KeyModifiers::NONE, KeyCode::Char('L')) | (KeyModifiers::SHIFT, KeyCode::Char('L')) => {
+        (KeyModifiers::NONE | KeyModifiers::SHIFT, KeyCode::Char('L')) => {
             // Like/favorite
             if let Some(post) = state.selected_post().cloned() {
                 if let Some(account) = find_account_for_post(state, &post) {
                     if post.liked {
                         state.set_status("Unliking...");
                         return Some(AsyncCommand::Unlike { post, account });
-                    } else {
-                        state.set_status("Liking...");
-                        return Some(AsyncCommand::Like { post, account });
                     }
-                } else {
-                    state.set_status("⚠ No matching account for this network");
+                    state.set_status("Liking...");
+                    return Some(AsyncCommand::Like { post, account });
                 }
+                state.set_status("⚠ No matching account for this network");
             }
             None
         }
@@ -313,13 +311,11 @@ fn handle_timeline_key(state: &mut AppState, key: KeyEvent) -> Option<AsyncComma
                     if post.reposted {
                         state.set_status("Undoing repost...");
                         return Some(AsyncCommand::Unrepost { post, account });
-                    } else {
-                        state.set_status("Reposting...");
-                        return Some(AsyncCommand::Repost { post, account });
                     }
-                } else {
-                    state.set_status("⚠ No matching account for this network");
+                    state.set_status("Reposting...");
+                    return Some(AsyncCommand::Repost { post, account });
                 }
+                state.set_status("⚠ No matching account for this network");
             }
             None
         }
@@ -372,7 +368,7 @@ fn handle_accounts_key(state: &mut AppState, key: KeyEvent) -> Option<AsyncComma
                 let account_id = account.id;
                 let network = account.network;
                 if let Err(e) = state.db.set_default_account(account_id, network) {
-                    state.set_status(format!("❌ Failed to set default: {}", e));
+                    state.set_status(format!("❌ Failed to set default: {e}"));
                 } else {
                     // Reload accounts to reflect change
                     if let Ok(accounts) = state.db.get_accounts() {
@@ -389,18 +385,21 @@ fn handle_accounts_key(state: &mut AppState, key: KeyEvent) -> Option<AsyncComma
                 let account_id = account.id;
                 let handle = account.handle.clone();
                 if let Err(e) = state.db.delete_account(account_id) {
-                    state.set_status(format!("❌ Failed to delete: {}", e));
+                    state.set_status(format!("❌ Failed to delete: {e}"));
                 } else {
                     // Remove credentials
-                    let _ = crate::auth::delete_credentials(&state.accounts[state.selected_account]);
+                    let _ =
+                        crate::auth::delete_credentials(&state.accounts[state.selected_account]);
                     // Reload accounts
                     if let Ok(accounts) = state.db.get_accounts() {
                         state.accounts = accounts;
-                        if state.selected_account >= state.accounts.len() && !state.accounts.is_empty() {
+                        if state.selected_account >= state.accounts.len()
+                            && !state.accounts.is_empty()
+                        {
                             state.selected_account = state.accounts.len() - 1;
                         }
                     }
-                    state.set_status(format!("🗑 Deleted @{}", handle));
+                    state.set_status(format!("🗑 Deleted @{handle}"));
                 }
             }
             None
@@ -450,15 +449,19 @@ fn handle_compose_key(state: &mut AppState, key: KeyEvent) -> Option<AsyncComman
                     .filter(|a| state.compose_networks.contains(&a.network))
                     .cloned()
                     .collect();
-                
+
                 if accounts.is_empty() {
                     state.set_status("⚠ No accounts for selected networks");
                     return None;
                 }
-                
+
                 state.loading = true;
                 state.close_compose();
-                Some(AsyncCommand::Post { content, accounts, reply_to })
+                Some(AsyncCommand::Post {
+                    content,
+                    accounts,
+                    reply_to,
+                })
             } else {
                 if state.compose_text.is_empty() {
                     state.set_status("⚠ Write something first!");
@@ -498,20 +501,25 @@ fn handle_search_key(state: &mut AppState, key: KeyEvent) -> Option<AsyncCommand
             if !state.search_query.is_empty() {
                 // Filter posts by search query (local search)
                 let query = state.search_query.to_lowercase();
-                let filtered: Vec<_> = state.posts.iter()
+                let filtered: Vec<_> = state
+                    .posts
+                    .iter()
                     .filter(|p| {
-                        p.content.to_lowercase().contains(&query) ||
-                        p.author_handle.to_lowercase().contains(&query) ||
-                        p.author_name.to_lowercase().contains(&query)
+                        p.content.to_lowercase().contains(&query)
+                            || p.author_handle.to_lowercase().contains(&query)
+                            || p.author_name.to_lowercase().contains(&query)
                     })
                     .cloned()
                     .collect();
-                
+
                 let count = filtered.len();
                 state.posts = filtered;
                 state.selected_post = 0;
                 state.mode = Mode::Normal;
-                state.set_status(format!("✓ Found {} posts matching '{}'", count, state.search_query));
+                state.set_status(format!(
+                    "✓ Found {} posts matching '{}'",
+                    count, state.search_query
+                ));
                 state.search_query.clear();
             }
         }
@@ -571,11 +579,11 @@ fn handle_about_key(state: &mut AppState, key: KeyEvent) {
         KeyCode::Esc | KeyCode::Enter | KeyCode::Char('q') => {
             state.mode = Mode::Normal;
         }
-        KeyCode::Char('g') | KeyCode::Char('G') => {
+        KeyCode::Char('g' | 'G') => {
             // Open GitHub repository
             let _ = open::that("https://github.com/ricardodantas/perch");
         }
-        KeyCode::Char('u') | KeyCode::Char('U') => {
+        KeyCode::Char('u' | 'U') => {
             // Trigger update if available
             if state.update_available.is_some() {
                 state.mode = Mode::UpdateConfirm;
@@ -587,10 +595,10 @@ fn handle_about_key(state: &mut AppState, key: KeyEvent) {
 
 fn handle_update_confirm_key(state: &mut AppState, key: KeyEvent) {
     match key.code {
-        KeyCode::Esc | KeyCode::Char('n') | KeyCode::Char('N') => {
+        KeyCode::Esc | KeyCode::Char('n' | 'N') => {
             state.mode = Mode::Normal;
         }
-        KeyCode::Enter | KeyCode::Char('y') | KeyCode::Char('Y') => {
+        KeyCode::Enter | KeyCode::Char('y' | 'Y') => {
             // Set updating mode and flag - actual update runs on next tick
             state.mode = Mode::Updating;
             state.update_status = Some("Updating... please wait".to_string());
@@ -601,7 +609,10 @@ fn handle_update_confirm_key(state: &mut AppState, key: KeyEvent) {
 }
 
 /// Find an account that matches the network of a post
-fn find_account_for_post(state: &AppState, post: &crate::models::Post) -> Option<crate::models::Account> {
+fn find_account_for_post(
+    state: &AppState,
+    post: &crate::models::Post,
+) -> Option<crate::models::Account> {
     state
         .accounts
         .iter()

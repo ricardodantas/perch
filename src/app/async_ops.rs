@@ -5,10 +5,10 @@
 use anyhow::Result;
 use tokio::sync::mpsc;
 
+use super::state::ReplyItem;
 use crate::api::get_client;
 use crate::auth;
 use crate::models::{Account, Post};
-use super::state::ReplyItem;
 
 /// Commands sent from the TUI to the async worker
 #[derive(Debug, Clone)]
@@ -42,7 +42,10 @@ pub enum AsyncResult {
     TimelineRefreshed { posts: Vec<Post> },
     /// Context/replies fetched for a post
     #[allow(dead_code)]
-    ContextFetched { post_id: String, replies: Vec<ReplyItem> },
+    ContextFetched {
+        post_id: String,
+        replies: Vec<ReplyItem>,
+    },
     /// Post was liked
     #[allow(dead_code)]
     Liked { post_id: String },
@@ -99,7 +102,11 @@ pub fn spawn_worker() -> AsyncHandle {
                 AsyncCommand::Unrepost { post, account } => {
                     handle_unrepost(&result_tx, post, account).await;
                 }
-                AsyncCommand::Post { content, accounts, reply_to } => {
+                AsyncCommand::Post {
+                    content,
+                    accounts,
+                    reply_to,
+                } => {
                     handle_post(&result_tx, content, accounts, reply_to).await;
                 }
             }
@@ -191,30 +198,32 @@ async fn handle_fetch_context(result_tx: &mpsc::Sender<AsyncResult>, post: Post,
         Err(_) => return,
     };
 
-    match client.get_context(&post).await {
-        Ok(flat_replies) => {
-            // Build threaded reply list with depth
-            let reply_items = build_reply_tree(&post.network_id, &flat_replies);
-            
-            let _ = result_tx
-                .send(AsyncResult::ContextFetched {
-                    post_id: post.network_id,
-                    replies: reply_items,
-                })
-                .await;
-        }
-        Err(_) => {
-            // Silently fail - replies are optional
-        }
+    if let Ok(flat_replies) = client.get_context(&post).await {
+        // Build threaded reply list with depth
+        let reply_items = build_reply_tree(&post.network_id, &flat_replies);
+
+        let _ = result_tx
+            .send(AsyncResult::ContextFetched {
+                post_id: post.network_id,
+                replies: reply_items,
+            })
+            .await;
+    } else {
+        // Silently fail - replies are optional
     }
 }
 
 /// Build a flat list of replies with depth from a threaded structure
 fn build_reply_tree(root_id: &str, replies: &[Post]) -> Vec<ReplyItem> {
     let mut result = Vec::new();
-    
+
     // Find direct replies to the root and recursively add their children
-    fn add_replies(parent_id: &str, all_replies: &[Post], result: &mut Vec<ReplyItem>, depth: usize) {
+    fn add_replies(
+        parent_id: &str,
+        all_replies: &[Post],
+        result: &mut Vec<ReplyItem>,
+        depth: usize,
+    ) {
         for reply in all_replies {
             if reply.reply_to_id.as_deref() == Some(parent_id) {
                 result.push(ReplyItem {
@@ -226,7 +235,7 @@ fn build_reply_tree(root_id: &str, replies: &[Post]) -> Vec<ReplyItem> {
             }
         }
     }
-    
+
     add_replies(root_id, replies, &mut result, 0);
     result
 }
@@ -275,7 +284,7 @@ async fn handle_like(result_tx: &mpsc::Sender<AsyncResult>, post: Post, account:
         Err(e) => {
             let _ = result_tx
                 .send(AsyncResult::Error {
-                    message: format!("Like failed: {}", e),
+                    message: format!("Like failed: {e}"),
                 })
                 .await;
         }
@@ -311,7 +320,7 @@ async fn handle_unlike(result_tx: &mpsc::Sender<AsyncResult>, post: Post, accoun
         Err(e) => {
             let _ = result_tx
                 .send(AsyncResult::Error {
-                    message: format!("Unlike failed: {}", e),
+                    message: format!("Unlike failed: {e}"),
                 })
                 .await;
         }
@@ -347,7 +356,7 @@ async fn handle_repost(result_tx: &mpsc::Sender<AsyncResult>, post: Post, accoun
         Err(e) => {
             let _ = result_tx
                 .send(AsyncResult::Error {
-                    message: format!("Repost failed: {}", e),
+                    message: format!("Repost failed: {e}"),
                 })
                 .await;
         }
@@ -383,7 +392,7 @@ async fn handle_unrepost(result_tx: &mpsc::Sender<AsyncResult>, post: Post, acco
         Err(e) => {
             let _ = result_tx
                 .send(AsyncResult::Error {
-                    message: format!("Unrepost failed: {}", e),
+                    message: format!("Unrepost failed: {e}"),
                 })
                 .await;
         }
@@ -396,7 +405,11 @@ async fn handle_post(
     accounts: Vec<Account>,
     reply_to: Option<Post>,
 ) {
-    let action = if reply_to.is_some() { "Replying..." } else { "Posting..." };
+    let action = if reply_to.is_some() {
+        "Replying..."
+    } else {
+        "Posting..."
+    };
     let _ = result_tx
         .send(AsyncResult::Status {
             message: format!("{} (to {} accounts)", action, accounts.len()),
@@ -410,7 +423,11 @@ async fn handle_post(
         let token = match auth::get_credentials(account) {
             Ok(Some(t)) => t,
             Ok(None) => {
-                errors.push(format!("No credentials for {} (@{})", account.network.name(), account.handle));
+                errors.push(format!(
+                    "No credentials for {} (@{})",
+                    account.network.name(),
+                    account.handle
+                ));
                 continue;
             }
             Err(e) => {
@@ -428,7 +445,8 @@ async fn handle_post(
         };
 
         // Check if we're replying and this account matches the reply network
-        let reply_id = reply_to.as_ref()
+        let reply_id = reply_to
+            .as_ref()
             .filter(|p| p.network == account.network)
             .map(|p| p.network_id.clone());
 
@@ -449,22 +467,24 @@ async fn handle_post(
     }
 
     if !posted.is_empty() {
-        let _ = result_tx
-            .send(AsyncResult::Posted { posts: posted })
-            .await;
+        let _ = result_tx.send(AsyncResult::Posted { posts: posted }).await;
     }
 
-    let success_msg = if reply_to.is_some() { "Replied successfully!" } else { "Posted successfully!" };
-    if !errors.is_empty() {
+    let success_msg = if reply_to.is_some() {
+        "Replied successfully!"
+    } else {
+        "Posted successfully!"
+    };
+    if errors.is_empty() {
         let _ = result_tx
-            .send(AsyncResult::Error {
-                message: errors.join("; "),
+            .send(AsyncResult::Status {
+                message: success_msg.to_string(),
             })
             .await;
     } else {
         let _ = result_tx
-            .send(AsyncResult::Status {
-                message: success_msg.to_string(),
+            .send(AsyncResult::Error {
+                message: errors.join("; "),
             })
             .await;
     }

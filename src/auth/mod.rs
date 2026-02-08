@@ -4,8 +4,8 @@
 //! The encryption key is derived from machine-specific identifiers.
 
 use aes_gcm::{
-    aead::{Aead, KeyInit},
     Aes256Gcm, Nonce,
+    aead::{Aead, KeyInit},
 };
 use anyhow::{Context, Result};
 use rand::Rng;
@@ -27,7 +27,7 @@ fn credentials_path() -> Result<PathBuf> {
 /// Get machine ID for key derivation (cross-platform)
 fn get_machine_id() -> String {
     // Try platform-specific machine IDs first
-    
+
     // Linux: /etc/machine-id or /var/lib/dbus/machine-id
     #[cfg(target_os = "linux")]
     {
@@ -38,7 +38,7 @@ fn get_machine_id() -> String {
             return id.trim().to_string();
         }
     }
-    
+
     // macOS: IOPlatformUUID via ioreg
     #[cfg(target_os = "macos")]
     {
@@ -56,7 +56,7 @@ fn get_machine_id() -> String {
             }
         }
     }
-    
+
     // Windows: MachineGuid from registry
     #[cfg(target_os = "windows")]
     {
@@ -79,89 +79,90 @@ fn get_machine_id() -> String {
             }
         }
     }
-    
+
     // Fallback: use home directory path (always available via dirs crate)
-    dirs::home_dir()
-        .map(|p| p.to_string_lossy().to_string())
-        .unwrap_or_else(|| "perch-fallback-key".to_string())
+    dirs::home_dir().map_or_else(
+        || "perch-fallback-key".to_string(),
+        |p| p.to_string_lossy().to_string(),
+    )
 }
 
 /// Derive encryption key from machine-specific data
 fn derive_key() -> [u8; 32] {
     let mut hasher = Sha256::new();
-    
+
     // Primary: machine-specific ID
     hasher.update(get_machine_id().as_bytes());
-    
+
     // Secondary: home directory path (cross-platform via dirs crate)
     if let Some(home) = dirs::home_dir() {
         hasher.update(home.to_string_lossy().as_bytes());
     }
-    
+
     // Tertiary: data directory path
     if let Some(data) = dirs::data_dir() {
         hasher.update(data.to_string_lossy().as_bytes());
     }
-    
+
     // Fixed salt for this app
     hasher.update(b"perch-social-client-v1");
-    
+
     hasher.finalize().into()
 }
 
 /// Load all credentials from encrypted file
 fn load_credentials() -> Result<HashMap<String, String>> {
     let path = credentials_path()?;
-    
+
     if !path.exists() {
         return Ok(HashMap::new());
     }
-    
+
     let encrypted = fs::read(&path).context("Failed to read credentials file")?;
-    
+
     if encrypted.len() < NONCE_SIZE {
         return Ok(HashMap::new());
     }
-    
+
     let (nonce_bytes, ciphertext) = encrypted.split_at(NONCE_SIZE);
     let nonce = Nonce::from_slice(nonce_bytes);
-    
+
     let key = derive_key();
     let cipher = Aes256Gcm::new_from_slice(&key).expect("Invalid key length");
-    
+
     let plaintext = cipher
         .decrypt(nonce, ciphertext)
         .map_err(|_| anyhow::anyhow!("Failed to decrypt credentials"))?;
-    
+
     let json = String::from_utf8(plaintext).context("Invalid UTF-8 in credentials")?;
     let creds: HashMap<String, String> = serde_json::from_str(&json)?;
-    
+
     Ok(creds)
 }
 
 /// Save all credentials to encrypted file
 fn save_credentials(creds: &HashMap<String, String>) -> Result<()> {
     let path = credentials_path()?;
-    
+
     let json = serde_json::to_string(creds)?;
-    
+
     let key = derive_key();
     let cipher = Aes256Gcm::new_from_slice(&key).expect("Invalid key length");
-    
+
     let mut rng = rand::rng();
     let mut nonce_bytes = [0u8; NONCE_SIZE];
     rng.fill(&mut nonce_bytes);
     let nonce = Nonce::from_slice(&nonce_bytes);
-    
+
     let ciphertext = cipher
         .encrypt(nonce, json.as_bytes())
         .map_err(|_| anyhow::anyhow!("Failed to encrypt credentials"))?;
-    
+
     let mut output = nonce_bytes.to_vec();
     output.extend(ciphertext);
-    
+
     fs::write(&path, output).context("Failed to write credentials file")?;
-    
+
     // Set restrictive permissions on Unix
     #[cfg(unix)]
     {
@@ -170,7 +171,7 @@ fn save_credentials(creds: &HashMap<String, String>) -> Result<()> {
         perms.set_mode(0o600);
         fs::set_permissions(&path, perms)?;
     }
-    
+
     Ok(())
 }
 
@@ -197,8 +198,8 @@ pub fn delete_credentials(account: &Account) -> Result<()> {
 /// Store OAuth client credentials (for Mastodon instances)
 pub fn store_oauth_client(instance: &str, client_id: &str, client_secret: &str) -> Result<()> {
     let mut creds = load_credentials().unwrap_or_default();
-    let key = format!("oauth:{}:client", instance);
-    let value = format!("{}:{}", client_id, client_secret);
+    let key = format!("oauth:{instance}:client");
+    let value = format!("{client_id}:{client_secret}");
     creds.insert(key, value);
     save_credentials(&creds)
 }
@@ -206,8 +207,8 @@ pub fn store_oauth_client(instance: &str, client_id: &str, client_secret: &str) 
 /// Get OAuth client credentials for a Mastodon instance
 pub fn get_oauth_client(instance: &str) -> Result<Option<(String, String)>> {
     let creds = load_credentials()?;
-    let key = format!("oauth:{}:client", instance);
-    
+    let key = format!("oauth:{instance}:client");
+
     match creds.get(&key) {
         Some(value) => {
             let parts: Vec<&str> = value.splitn(2, ':').collect();

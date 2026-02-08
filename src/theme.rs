@@ -15,25 +15,25 @@ pub struct Theme(pub ThemeName);
 impl Theme {
     /// Get all available theme names.
     #[must_use]
-    pub fn all() -> &'static [ThemeName] {
+    pub const fn all() -> &'static [ThemeName] {
         ThemeName::all()
     }
 
     /// Get the next theme in rotation
     #[must_use]
-    pub fn next(&self) -> Theme {
-        Theme(self.0.next())
+    pub fn next(&self) -> Self {
+        Self(self.0.next())
     }
 
     /// Get the previous theme in rotation
     #[must_use]
-    pub fn prev(&self) -> Theme {
-        Theme(self.0.prev())
+    pub fn prev(&self) -> Self {
+        Self(self.0.prev())
     }
 
     /// Get the display name for the theme.
     #[must_use]
-    pub fn name(&self) -> &'static str {
+    pub const fn name(&self) -> &'static str {
         self.0.display_name()
     }
 
@@ -45,26 +45,26 @@ impl Theme {
 
     /// Get the raw color palette for this theme.
     #[must_use]
-    pub fn palette(&self) -> ThemePalette {
+    pub const fn palette(&self) -> ThemePalette {
         self.0.palette()
     }
 
-    /// Get the inner ThemeName
+    /// Get the inner `ThemeName`
     #[must_use]
-    pub fn inner(&self) -> ThemeName {
+    pub const fn inner(&self) -> ThemeName {
         self.0
     }
 
     /// Get the kebab-case slug for config files
     #[must_use]
-    pub fn slug(&self) -> &'static str {
+    pub const fn slug(&self) -> &'static str {
         self.0.slug()
     }
 }
 
 impl From<ThemeName> for Theme {
     fn from(name: ThemeName) -> Self {
-        Theme(name)
+        Self(name)
     }
 }
 
@@ -131,7 +131,7 @@ pub struct ThemeColors {
 }
 
 impl ThemeColors {
-    /// Create ThemeColors from a ThemePalette
+    /// Create `ThemeColors` from a `ThemePalette`
     #[must_use]
     pub fn from_palette(p: ThemePalette) -> Self {
         let bg_secondary = Self::adjust_brightness(p.bg, 10);
@@ -159,8 +159,8 @@ impl ThemeColors {
             selection: p.selection,
 
             // Network colors (approximate)
-            mastodon: Color::Rgb(99, 100, 255),  // #6364FF
-            bluesky: Color::Rgb(0, 133, 255),    // #0085FF
+            mastodon: Color::Rgb(99, 100, 255), // #6364FF
+            bluesky: Color::Rgb(0, 133, 255),   // #0085FF
 
             // Logo colors
             logo_primary: p.accent,

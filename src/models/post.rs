@@ -72,7 +72,7 @@ pub struct MediaAttachment {
 pub enum MediaType {
     /// Image (JPEG, PNG, GIF, WebP)
     Image,
-    /// Video (MP4, WebM)
+    /// Video (MP4, `WebM`)
     Video,
     /// Animated GIF (Mastodon-specific)
     Gifv,
@@ -119,7 +119,7 @@ impl Post {
             content
         } else {
             let truncated: String = chars[..max_len.saturating_sub(3)].iter().collect();
-            format!("{}...", truncated)
+            format!("{truncated}...")
         }
     }
 

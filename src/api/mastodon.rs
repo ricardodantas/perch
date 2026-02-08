@@ -34,7 +34,7 @@ impl MastodonClient {
 
 impl SocialApi for MastodonClient {
     async fn timeline(&self, limit: usize) -> Result<Vec<Post>> {
-        let url = self.api_url(&format!("/timelines/home?limit={}", limit));
+        let url = self.api_url(&format!("/timelines/home?limit={limit}"));
 
         let response = self
             .client
@@ -49,7 +49,10 @@ impl SocialApi for MastodonClient {
             .await
             .context("Failed to parse timeline response")?;
 
-        Ok(statuses.into_iter().map(|s| s.into_post()).collect())
+        Ok(statuses
+            .into_iter()
+            .map(MastodonStatus::into_post)
+            .collect())
     }
 
     async fn get_context(&self, post: &Post) -> Result<Vec<Post>> {
@@ -76,7 +79,11 @@ impl SocialApi for MastodonClient {
             .context("Failed to parse context response")?;
 
         // Return descendants (replies) only
-        Ok(context.descendants.into_iter().map(|s| s.into_post()).collect())
+        Ok(context
+            .descendants
+            .into_iter()
+            .map(MastodonStatus::into_post)
+            .collect())
     }
 
     async fn post(&self, content: &str) -> Result<Post> {
@@ -100,7 +107,7 @@ impl SocialApi for MastodonClient {
         if !response.status().is_success() {
             let status = response.status();
             let body = response.text().await.unwrap_or_default();
-            anyhow::bail!("Mastodon error {}: {}", status, body);
+            anyhow::bail!("Mastodon error {status}: {body}");
         }
 
         let status: MastodonStatus = response
@@ -133,7 +140,7 @@ impl SocialApi for MastodonClient {
         if !response.status().is_success() {
             let status = response.status();
             let body = response.text().await.unwrap_or_default();
-            anyhow::bail!("Mastodon error {}: {}", status, body);
+            anyhow::bail!("Mastodon error {status}: {body}");
         }
 
         let status: MastodonStatus = response
@@ -248,7 +255,7 @@ struct MastodonStatus {
     content: String,
     url: Option<String>,
     account: MastodonAccount,
-    reblog: Option<Box<MastodonStatus>>,
+    reblog: Option<Box<Self>>,
     favourites_count: u32,
     reblogs_count: u32,
     replies_count: u32,
@@ -302,8 +309,7 @@ impl MastodonStatus {
             .unwrap_or(content);
 
         let created_at = DateTime::parse_from_rfc3339(&self.created_at)
-            .map(|dt| dt.with_timezone(&Utc))
-            .unwrap_or_else(|_| Utc::now());
+            .map_or_else(|_| Utc::now(), |dt| dt.with_timezone(&Utc));
 
         Post {
             id: uuid::Uuid::new_v4(),
@@ -352,7 +358,7 @@ impl MastodonStatus {
 
 /// OAuth authentication flow for Mastodon
 pub mod oauth {
-    use super::*;
+    use super::{Client, Context, Deserialize, Result};
 
     /// Registered OAuth application credentials
     #[derive(Debug, Deserialize)]

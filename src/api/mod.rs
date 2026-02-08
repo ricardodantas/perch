@@ -50,72 +50,72 @@ impl Client {
     /// Get the home timeline
     pub async fn timeline(&self, limit: usize) -> Result<Vec<Post>> {
         match self {
-            Client::Mastodon(c) => c.timeline(limit).await,
-            Client::Bluesky(c) => c.timeline(limit).await,
+            Self::Mastodon(c) => c.timeline(limit).await,
+            Self::Bluesky(c) => c.timeline(limit).await,
         }
     }
 
     /// Get replies/context for a post
     pub async fn get_context(&self, post: &Post) -> Result<Vec<Post>> {
         match self {
-            Client::Mastodon(c) => c.get_context(post).await,
-            Client::Bluesky(c) => c.get_context(post).await,
+            Self::Mastodon(c) => c.get_context(post).await,
+            Self::Bluesky(c) => c.get_context(post).await,
         }
     }
 
     /// Post a new status
     pub async fn post(&self, content: &str) -> Result<Post> {
         match self {
-            Client::Mastodon(c) => c.post(content).await,
-            Client::Bluesky(c) => c.post(content).await,
+            Self::Mastodon(c) => c.post(content).await,
+            Self::Bluesky(c) => c.post(content).await,
         }
     }
 
     /// Reply to a post
     pub async fn reply(&self, content: &str, reply_to_id: &str) -> Result<Post> {
         match self {
-            Client::Mastodon(c) => c.reply(content, reply_to_id).await,
-            Client::Bluesky(c) => c.reply(content, reply_to_id).await,
+            Self::Mastodon(c) => c.reply(content, reply_to_id).await,
+            Self::Bluesky(c) => c.reply(content, reply_to_id).await,
         }
     }
 
     /// Like/favorite a post
     pub async fn like(&self, post: &Post) -> Result<()> {
         match self {
-            Client::Mastodon(c) => c.like(post).await,
-            Client::Bluesky(c) => c.like(post).await,
+            Self::Mastodon(c) => c.like(post).await,
+            Self::Bluesky(c) => c.like(post).await,
         }
     }
 
     /// Unlike/unfavorite a post
     pub async fn unlike(&self, post: &Post) -> Result<()> {
         match self {
-            Client::Mastodon(c) => c.unlike(post).await,
-            Client::Bluesky(c) => c.unlike(post).await,
+            Self::Mastodon(c) => c.unlike(post).await,
+            Self::Bluesky(c) => c.unlike(post).await,
         }
     }
 
     /// Repost/boost a post
     pub async fn repost(&self, post: &Post) -> Result<()> {
         match self {
-            Client::Mastodon(c) => c.repost(post).await,
-            Client::Bluesky(c) => c.repost(post).await,
+            Self::Mastodon(c) => c.repost(post).await,
+            Self::Bluesky(c) => c.repost(post).await,
         }
     }
 
     /// Unrepost/unboost a post
     pub async fn unrepost(&self, post: &Post) -> Result<()> {
         match self {
-            Client::Mastodon(c) => c.unrepost(post).await,
-            Client::Bluesky(c) => c.unrepost(post).await,
+            Self::Mastodon(c) => c.unrepost(post).await,
+            Self::Bluesky(c) => c.unrepost(post).await,
         }
     }
 
     /// Verify credentials and get account info
     pub async fn verify_credentials(&self) -> Result<Account> {
         match self {
-            Client::Mastodon(c) => c.verify_credentials().await,
-            Client::Bluesky(c) => c.verify_credentials().await,
+            Self::Mastodon(c) => c.verify_credentials().await,
+            Self::Bluesky(c) => c.verify_credentials().await,
         }
     }
 }
@@ -134,7 +134,8 @@ pub async fn get_client(account: &Account, token: &str) -> Result<Client> {
             } else {
                 &account.server
             };
-            let client = bluesky::BlueskyClient::login_with_pds(&account.handle, token, pds_url).await?;
+            let client =
+                bluesky::BlueskyClient::login_with_pds(&account.handle, token, pds_url).await?;
             Ok(Client::Bluesky(client))
         }
     }

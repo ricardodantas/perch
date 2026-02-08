@@ -10,7 +10,7 @@ use std::fs;
 use std::path::PathBuf;
 
 /// Get the Perch data directory (~/.config/perch/)
-/// 
+///
 /// This is consistent across all platforms for simplicity.
 pub fn perch_dir() -> Result<PathBuf> {
     let home = dirs::home_dir().context("Could not determine home directory")?;

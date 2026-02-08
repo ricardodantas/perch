@@ -11,7 +11,12 @@ pub enum VersionCheck {
     /// Running the latest version
     UpToDate,
     /// A newer version is available
-    UpdateAvailable { latest: String, current: String },
+    UpdateAvailable {
+        /// The latest version available
+        latest: String,
+        /// The current running version
+        current: String,
+    },
     /// Could not check (network error, etc.)
     CheckFailed(String),
 }
@@ -29,7 +34,7 @@ pub fn check_for_updates_crates_io_timeout(timeout: Duration) -> VersionCheck {
 
     let result = agent
         .get(url)
-        .set("User-Agent", &format!("perch/{}", VERSION))
+        .set("User-Agent", &format!("perch/{VERSION}"))
         .call();
 
     match result {
@@ -52,9 +57,9 @@ pub fn check_for_updates_crates_io_timeout(timeout: Duration) -> VersionCheck {
                     VersionCheck::CheckFailed("Could not parse crates.io response".to_string())
                 }
             }
-            Err(e) => VersionCheck::CheckFailed(format!("Failed to parse response: {}", e)),
+            Err(e) => VersionCheck::CheckFailed(format!("Failed to parse response: {e}")),
         },
-        Err(e) => VersionCheck::CheckFailed(format!("Request failed: {}", e)),
+        Err(e) => VersionCheck::CheckFailed(format!("Request failed: {e}")),
     }
 }
 
@@ -81,24 +86,29 @@ fn version_is_newer(latest: &str, current: &str) -> bool {
 /// Detected package manager for installation
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PackageManager {
+    /// Installed via cargo
     Cargo,
-    Homebrew { formula: String },
+    /// Installed via Homebrew
+    Homebrew {
+        /// The formula name (e.g., "perch" or "ricardodantas/tap/perch")
+        formula: String,
+    },
 }
 
 impl PackageManager {
     /// Get display name
-    pub fn name(&self) -> &'static str {
+    pub const fn name(&self) -> &'static str {
         match self {
-            PackageManager::Cargo => "cargo",
-            PackageManager::Homebrew { .. } => "brew",
+            Self::Cargo => "cargo",
+            Self::Homebrew { .. } => "brew",
         }
     }
 
     /// Get the update command
     pub fn update_command(&self) -> String {
         match self {
-            PackageManager::Cargo => "cargo install perch".to_string(),
-            PackageManager::Homebrew { formula } => format!("brew upgrade {}", formula),
+            Self::Cargo => "cargo install perch".to_string(),
+            Self::Homebrew { formula } => format!("brew upgrade {formula}"),
         }
     }
 }
@@ -144,8 +154,8 @@ pub fn run_update(pm: &PackageManager) -> Result<(), String> {
                 .status()
             {
                 Ok(status) if status.success() => Ok(()),
-                Ok(status) => Err(format!("Update failed with status: {}", status)),
-                Err(e) => Err(format!("Failed to run cargo: {}", e)),
+                Ok(status) => Err(format!("Update failed with status: {status}")),
+                Err(e) => Err(format!("Failed to run cargo: {e}")),
             }
         }
         PackageManager::Homebrew { formula } => {
@@ -170,11 +180,11 @@ pub fn run_update(pm: &PackageManager) -> Result<(), String> {
                         .status()
                     {
                         Ok(status) if status.success() => Ok(()),
-                        Ok(status) => Err(format!("Update failed with status: {}", status)),
-                        Err(e) => Err(format!("Failed to run brew: {}", e)),
+                        Ok(status) => Err(format!("Update failed with status: {status}")),
+                        Err(e) => Err(format!("Failed to run brew: {e}")),
                     }
                 }
-                Err(e) => Err(format!("Failed to run brew: {}", e)),
+                Err(e) => Err(format!("Failed to run brew: {e}")),
             }
         }
     }

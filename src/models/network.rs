@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Network {
-    /// Mastodon (and compatible ActivityPub servers)
+    /// Mastodon (and compatible `ActivityPub` servers)
     #[default]
     Mastodon,
     /// Bluesky (AT Protocol)
