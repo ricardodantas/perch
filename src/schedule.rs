@@ -8,8 +8,8 @@ use chrono::{DateTime, Duration, Local, NaiveDateTime, NaiveTime, TimeZone, Utc}
 /// Supports formats:
 /// - Relative: "in 5m", "in 2h", "in 1d", "in 30 minutes", "in 2 hours"
 /// - Absolute time today: "15:00", "3pm", "15:30"
-/// - Absolute datetime: "2026-02-08 15:00", "2026-02-08T15:00:00"
-/// - ISO 8601: "2026-02-08T15:00:00Z", "2026-02-08T15:00:00+01:00"
+/// - Absolute datetime: "YYYY-MM-DD 15:00", "YYYY-MM-DDT15:00:00"
+/// - ISO 8601: "YYYY-MM-DDT15:00:00Z", "YYYY-MM-DDT15:00:00+01:00"
 pub fn parse_schedule_time(input: &str) -> Result<DateTime<Utc>> {
     let input = input.trim().to_lowercase();
 
@@ -66,7 +66,7 @@ pub fn parse_schedule_time(input: &str) -> Result<DateTime<Utc>> {
          Supported formats:\n  \
          - Relative: 'in 5m', 'in 2h', 'in 1d', 'in 30 minutes'\n  \
          - Time today: '15:00', '3pm', '15:30'\n  \
-         - Date+time: '2026-02-08 15:00'",
+         - Date+time: 'YYYY-MM-DD 15:00'",
         input
     ))
 }

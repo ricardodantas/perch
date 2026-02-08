@@ -218,7 +218,7 @@ COMMANDS:
         perch post "Hello Fediverse!" --to mastodon
         perch post "Hello!" --to mastodon,bluesky
         perch post "Good morning!" --schedule "in 2h"
-        perch post "Scheduled!" --schedule "2026-02-08 15:00"
+        perch post "Scheduled!" --schedule "YYYY-MM-DD HH:MM"
 
     schedule [SUBCOMMAND]              Manage scheduled posts
       Subcommands:
@@ -247,7 +247,7 @@ COMMANDS:
 SCHEDULE TIME FORMATS:
     Relative:    "in 5m", "in 2h", "in 1d", "in 30 minutes"
     Time today:  "15:00", "3pm" (schedules for tomorrow if past)
-    Date+time:   "2026-02-08 15:00", "2026-02-08T15:00"
+    Date+time:   "YYYY-MM-DD HH:MM", "YYYY-MM-DDTHH:MM"
 
 OPTIONS:
     -h, --help                         Show this help message

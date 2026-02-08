@@ -270,7 +270,7 @@ perch post "Check this out!" --media ~/photo.jpg
 ```bash
 # Schedule a post for later
 perch post "Good morning!" --schedule "in 2h"
-perch post "Happy Friday!" --schedule "2026-02-14 09:00" --to mastodon,bluesky
+perch post "Happy Friday!" --schedule "YYYY-MM-DD HH:MM" --to mastodon,bluesky
 
 # List pending scheduled posts
 perch schedule list
@@ -289,7 +289,7 @@ perch schedule daemon --interval 30  # Check every 30 seconds
 **Schedule time formats:**
 - Relative: `"in 5m"`, `"in 2h"`, `"in 1d"`, `"in 30 minutes"`
 - Time today: `"15:00"`, `"3pm"` (schedules for tomorrow if past)
-- Date+time: `"2026-02-08 15:00"`, `"2026-02-08T15:00"`
+- Date+time: `"YYYY-MM-DD HH:MM"`, `"YYYY-MM-DDTHH:MM"`
 
 **TUI Scheduling:**
 In the compose dialog (`n`), press `Tab` to switch to the schedule input field. Type your schedule time and it validates in real-time. Press `Tab` or `Enter` to confirm, `F4` to clear.

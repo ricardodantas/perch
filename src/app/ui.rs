@@ -1088,7 +1088,7 @@ fn render_compose_popup(frame: &mut Frame, state: &AppState) {
         if state.compose_schedule_focused {
             Span::styled(
                 if state.compose_schedule_input.is_empty() {
-                    "in 1h, 15:00, 2026-02-08 15:00...".to_string()
+                    "in 1h, 15:00, tomorrow 09:00...".to_string()
                 } else {
                     state.compose_schedule_input.clone()
                 },
