@@ -23,6 +23,7 @@ crossterm = "0.29"
 
 # HTTP client
 reqwest = { version = "0.13", default-features = false, features = ["rustls", "json", "form"] }
+ureq = { version = "2.10", features = ["json"] }
 
 # Serialization
 serde = { version = "1.0.228", features = ["derive"] }

@@ -3,7 +3,7 @@
 use ratatui::{
     Frame,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
-    style::{Modifier, Style},
+    style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, BorderType, Borders, Clear, List, ListItem, Paragraph, Tabs, Wrap},
 };
@@ -54,7 +54,14 @@ pub fn render(frame: &mut Frame, state: &AppState) {
         Mode::About => render_about_dialog(frame, state),
         Mode::Compose => render_compose_popup(frame, state),
         Mode::Search => render_search_popup(frame, state),
+        Mode::UpdateConfirm => render_update_confirm_dialog(frame, state),
+        Mode::Updating => render_updating_overlay(frame, state),
         Mode::Normal => {}
+    }
+    
+    // Render update status banner if present
+    if state.mode == Mode::Normal && state.update_status.is_some() {
+        render_update_status(frame, state);
     }
 }
 
@@ -492,6 +499,20 @@ fn render_status_bar(frame: &mut Frame, state: &AppState, area: Rect) {
             Span::styled(&loading_indicator, colors.text_secondary()),
             Span::styled(&state.status, colors.text_secondary()),
         ]
+    } else if let Some(ref version) = state.update_available {
+        // Show update notification
+        vec![
+            Span::styled(" ⬆ ", Style::default().fg(Color::Yellow)),
+            Span::styled(
+                format!("Update available: v{}", version),
+                Style::default().fg(Color::Yellow),
+            ),
+            Span::styled("  Press ", colors.text_muted()),
+            Span::styled("A", colors.key_hint()),
+            Span::styled(" then ", colors.text_muted()),
+            Span::styled("U", colors.key_hint()),
+            Span::styled(" to update", colors.text_muted()),
+        ]
     } else {
         vec![
             Span::styled(" ", Style::default()),
@@ -846,19 +867,39 @@ fn render_about_dialog(frame: &mut Frame, state: &AppState) {
             colors.text_muted().add_modifier(Modifier::ITALIC),
         )),
         Line::from(""),
-        Line::from(vec![
+    ]);
+    
+    // Build action hints line
+    let mut actions: Vec<Span> = vec![
+        Span::styled(
+            " [G] ",
+            Style::default()
+                .fg(colors.primary)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::raw("Open GitHub"),
+    ];
+    
+    if state.update_available.is_some() {
+        actions.extend([
+            Span::raw("  "),
             Span::styled(
-                " [G] ",
+                " [U] ",
                 Style::default()
-                    .fg(colors.primary)
+                    .fg(Color::Yellow)
                     .add_modifier(Modifier::BOLD),
             ),
-            Span::raw("Open GitHub"),
-            Span::raw("    "),
-            Span::styled(" [Esc] ", colors.text_muted()),
-            Span::raw("Close"),
-        ]),
+            Span::raw("Update"),
+        ]);
+    }
+    
+    actions.extend([
+        Span::raw("    "),
+        Span::styled(" [Esc] ", colors.text_muted()),
+        Span::raw("Close"),
     ]);
+    
+    lines.push(Line::from(actions));
 
     let paragraph = Paragraph::new(lines).alignment(Alignment::Center).block(
         Block::default()
@@ -1066,5 +1107,137 @@ fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
         y: r.y + (r.height.saturating_sub(popup_height)) / 2,
         width: popup_width,
         height: popup_height,
+    }
+}
+
+fn render_update_confirm_dialog(frame: &mut Frame, state: &AppState) {
+    let colors = state.theme.colors();
+    let area = frame.area();
+
+    // Center popup
+    let popup_width = 50u16;
+    let popup_height = 9u16;
+    let popup_area = Rect {
+        x: area.width.saturating_sub(popup_width) / 2,
+        y: area.height.saturating_sub(popup_height) / 2,
+        width: popup_width.min(area.width),
+        height: popup_height.min(area.height),
+    };
+
+    frame.render_widget(Clear, popup_area);
+
+    let latest = state.update_available.as_deref().unwrap_or("unknown");
+    let pm = &state.package_manager;
+
+    let lines = vec![
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("Update to ", colors.text()),
+            Span::styled(
+                format!("v{}", latest),
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled("?", colors.text()),
+        ]),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("Command: ", colors.text_muted()),
+            Span::styled(pm.update_command(), Style::default().fg(colors.primary)),
+        ]),
+        Line::from(""),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled(
+                " [Y] ",
+                Style::default()
+                    .fg(Color::Green)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::raw("Yes, update"),
+            Span::raw("    "),
+            Span::styled(" [N/Esc] ", colors.text_muted()),
+            Span::raw("Cancel"),
+        ]),
+    ];
+
+    let paragraph = Paragraph::new(lines).alignment(Alignment::Center).block(
+        Block::default()
+            .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
+            .border_style(Style::default().fg(Color::Yellow))
+            .style(Style::default().bg(colors.bg))
+            .title(" ⬆️ Update Perch ")
+            .title_style(
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ),
+    );
+
+    frame.render_widget(paragraph, popup_area);
+}
+
+fn render_updating_overlay(frame: &mut Frame, state: &AppState) {
+    let colors = state.theme.colors();
+    let area = frame.area();
+
+    let popup_width = 40u16;
+    let popup_height = 5u16;
+    let popup_area = Rect {
+        x: area.width.saturating_sub(popup_width) / 2,
+        y: area.height.saturating_sub(popup_height) / 2,
+        width: popup_width.min(area.width),
+        height: popup_height.min(area.height),
+    };
+
+    frame.render_widget(Clear, popup_area);
+
+    let msg = state.update_status.as_deref().unwrap_or("Updating...");
+
+    let paragraph = Paragraph::new(vec![
+        Line::from(""),
+        Line::from(Span::styled(msg, colors.text())),
+    ])
+    .alignment(Alignment::Center)
+    .block(
+        Block::default()
+            .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
+            .border_style(Style::default().fg(Color::Yellow))
+            .style(Style::default().bg(colors.bg)),
+    );
+
+    frame.render_widget(paragraph, popup_area);
+}
+
+fn render_update_status(frame: &mut Frame, state: &AppState) {
+    let colors = state.theme.colors();
+    let area = frame.area();
+
+    if let Some(ref status) = state.update_status {
+        let banner_height = 3u16;
+        let banner_area = Rect {
+            x: 0,
+            y: area.height.saturating_sub(banner_height + 1),
+            width: area.width,
+            height: banner_height,
+        };
+
+        let is_success = status.contains("complete");
+        let border_color = if is_success { Color::Green } else { Color::Yellow };
+
+        let paragraph = Paragraph::new(Line::from(status.as_str()))
+            .alignment(Alignment::Center)
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_type(BorderType::Rounded)
+                    .border_style(Style::default().fg(border_color))
+                    .style(Style::default().bg(colors.bg)),
+            );
+
+        frame.render_widget(paragraph, banner_area);
     }
 }

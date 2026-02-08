@@ -60,6 +60,18 @@ pub fn run() -> Result<()> {
         state.set_status("Loading timeline...");
     }
 
+    // Spawn background update check
+    std::thread::spawn(|| {
+        if let crate::VersionCheck::UpdateAvailable { latest, .. } = 
+            crate::check_for_updates_crates_io() 
+        {
+            // We can't easily send to main thread without channels, 
+            // but we can use a static or file. For simplicity, we'll check in the main loop.
+            // This thread just warms up the check.
+            let _ = latest;
+        }
+    });
+
     // Main loop
     let result = run_app(&mut terminal, &mut state, async_handle, &rt);
 
@@ -71,16 +83,48 @@ pub fn run() -> Result<()> {
     result
 }
 
+/// Background message types
+enum BackgroundMsg {
+    UpdateAvailable(String),
+}
+
 fn run_app(
     terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
     state: &mut AppState,
     mut async_handle: AsyncHandle,
     _rt: &Runtime,
 ) -> Result<()> {
+    // Channel for background messages
+    let (bg_tx, bg_rx) = std::sync::mpsc::channel::<BackgroundMsg>();
+    
+    // Spawn background update check
+    std::thread::spawn(move || {
+        if let crate::VersionCheck::UpdateAvailable { latest, .. } = 
+            crate::check_for_updates_crates_io() 
+        {
+            let _ = bg_tx.send(BackgroundMsg::UpdateAvailable(latest));
+        }
+    });
+
     loop {
+        // Check for background messages (non-blocking)
+        if let Ok(msg) = bg_rx.try_recv() {
+            match msg {
+                BackgroundMsg::UpdateAvailable(version) => {
+                    state.set_update_available(version);
+                }
+            }
+        }
+
         // Process any async results
         while let Ok(result) = async_handle.result_rx.try_recv() {
             handle_async_result(state, result);
+        }
+
+        // Process pending update if flagged
+        if state.pending_update {
+            events::process_pending_update(state);
+            terminal.draw(|frame| ui::render(frame, state))?;
         }
 
         // Draw UI

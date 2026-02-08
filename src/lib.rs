@@ -86,6 +86,7 @@ pub mod models;
 pub mod paths;
 pub mod sync;
 pub mod theme;
+pub mod update;
 
 // Re-export main types for convenience
 pub use app::AppState;
@@ -93,6 +94,7 @@ pub use config::Config;
 pub use db::Database;
 pub use models::{Account, Network, Post};
 pub use theme::{Theme, ThemeColors};
+pub use update::{PackageManager, VersionCheck, check_for_updates_crates_io, detect_package_manager, run_update};
 
 // Re-export theme types from ratatui-themes crate
 pub use ratatui_themes::{ThemeName, ThemePalette};

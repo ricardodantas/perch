@@ -72,6 +72,10 @@ pub enum Mode {
     ThemePicker,
     /// About dialog
     About,
+    /// Update confirmation dialog
+    UpdateConfirm,
+    /// Update in progress
+    Updating,
 }
 
 /// Timeline filter
@@ -170,6 +174,15 @@ pub struct AppState {
 
     /// Theme picker index
     pub theme_picker_index: usize,
+    
+    /// Update available (version string if newer version exists)
+    pub update_available: Option<String>,
+    /// Package manager for updates
+    pub package_manager: crate::update::PackageManager,
+    /// Update status message
+    pub update_status: Option<String>,
+    /// Flag to trigger update on next tick
+    pub pending_update: bool,
 }
 
 impl AppState {
@@ -212,6 +225,10 @@ impl AppState {
             loading: false,
             tick: 0,
             theme_picker_index,
+            update_available: None,
+            package_manager: crate::update::detect_package_manager(),
+            update_status: None,
+            pending_update: false,
         })
     }
 
@@ -233,6 +250,16 @@ impl AppState {
     /// Clear status message
     pub fn clear_status(&mut self) {
         self.status.clear();
+    }
+
+    /// Set update available (called from background task)
+    pub fn set_update_available(&mut self, version: String) {
+        self.update_available = Some(version.clone());
+        self.set_status(format!(
+            "Update available: v{} (current: v{})",
+            version,
+            crate::update::VERSION
+        ));
     }
 
     /// Get the currently selected post

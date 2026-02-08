@@ -7,6 +7,26 @@ use super::state::{AppState, FocusedPanel, Mode, View};
 use crate::models::Network;
 use crate::theme::Theme;
 
+/// Process pending update (called from main loop)
+pub fn process_pending_update(state: &mut AppState) {
+    if !state.pending_update {
+        return;
+    }
+    state.pending_update = false;
+
+    // Run the actual update
+    match crate::run_update(&state.package_manager) {
+        Ok(()) => {
+            state.update_status = Some("Update complete! Please restart perch.".to_string());
+            state.update_available = None;
+        }
+        Err(e) => {
+            state.update_status = Some(format!("Update failed: {}", e));
+        }
+    }
+    state.mode = Mode::Normal;
+}
+
 /// Handle key events, returning an optional async command
 pub fn handle_key(state: &mut AppState, key: KeyEvent) -> Option<AsyncCommand> {
     // Handle mode-specific input first
@@ -30,6 +50,14 @@ pub fn handle_key(state: &mut AppState, key: KeyEvent) -> Option<AsyncCommand> {
         }
         Mode::Search => {
             return handle_search_key(state, key);
+        }
+        Mode::UpdateConfirm => {
+            handle_update_confirm_key(state, key);
+            return None;
+        }
+        Mode::Updating => {
+            // No input during update
+            return None;
         }
         Mode::Normal => {}
     }
@@ -539,6 +567,27 @@ fn handle_about_key(state: &mut AppState, key: KeyEvent) {
         KeyCode::Char('g') | KeyCode::Char('G') => {
             // Open GitHub repository
             let _ = open::that("https://github.com/ricardodantas/perch");
+        }
+        KeyCode::Char('u') | KeyCode::Char('U') => {
+            // Trigger update if available
+            if state.update_available.is_some() {
+                state.mode = Mode::UpdateConfirm;
+            }
+        }
+        _ => {}
+    }
+}
+
+fn handle_update_confirm_key(state: &mut AppState, key: KeyEvent) {
+    match key.code {
+        KeyCode::Esc | KeyCode::Char('n') | KeyCode::Char('N') => {
+            state.mode = Mode::Normal;
+        }
+        KeyCode::Enter | KeyCode::Char('y') | KeyCode::Char('Y') => {
+            // Set updating mode and flag - actual update runs on next tick
+            state.mode = Mode::Updating;
+            state.update_status = Some("Updating... please wait".to_string());
+            state.pending_update = true;
         }
         _ => {}
     }
