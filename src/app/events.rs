@@ -103,6 +103,13 @@ pub fn handle_key(state: &mut AppState, key: KeyEvent) -> Option<AsyncCommand> {
             state.mode = Mode::About;
             return None;
         }
+        // Update (when available)
+        (_, KeyCode::Char('u')) | (_, KeyCode::Char('U')) => {
+            if state.update_available.is_some() {
+                state.mode = Mode::UpdateConfirm;
+            }
+            return None;
+        }
         _ => {}
     }
 

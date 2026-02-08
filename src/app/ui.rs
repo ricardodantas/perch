@@ -34,18 +34,37 @@ pub fn render(frame: &mut Frame, state: &AppState) {
     let bg_block = Block::default().style(Style::default().bg(colors.bg));
     frame.render_widget(bg_block, area);
 
+    // Check if we need to show update banner
+    let has_update = state.update_available.is_some();
+
     let chunks = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Length(3), // Tabs
-            Constraint::Min(0),    // Main content
-            Constraint::Length(1), // Status bar
-        ])
+        .constraints(if has_update {
+            vec![
+                Constraint::Length(3), // Update banner
+                Constraint::Length(3), // Tabs
+                Constraint::Min(0),    // Main content
+                Constraint::Length(1), // Status bar
+            ]
+        } else {
+            vec![
+                Constraint::Length(3), // Tabs
+                Constraint::Min(0),    // Main content
+                Constraint::Length(1), // Status bar
+            ]
+        })
         .split(area);
 
-    render_tabs(frame, state, chunks[0]);
-    render_main(frame, state, chunks[1]);
-    render_status_bar(frame, state, chunks[2]);
+    let (tabs_area, main_area, status_area) = if has_update {
+        render_update_banner(frame, state, chunks[0]);
+        (chunks[1], chunks[2], chunks[3])
+    } else {
+        (chunks[0], chunks[1], chunks[2])
+    };
+
+    render_tabs(frame, state, tabs_area);
+    render_main(frame, state, main_area);
+    render_status_bar(frame, state, status_area);
 
     // Render modal dialogs
     match state.mode {
@@ -1107,6 +1126,44 @@ fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
         y: r.y + (r.height.saturating_sub(popup_height)) / 2,
         width: popup_width,
         height: popup_height,
+    }
+}
+
+fn render_update_banner(frame: &mut Frame, state: &AppState, area: Rect) {
+    let colors = state.theme.colors();
+
+    if let Some(ref latest) = state.update_available {
+        let pm = &state.package_manager;
+        let banner = Paragraph::new(Line::from(vec![
+            Span::styled("  ⬆️  ", Style::default().fg(Color::Yellow)),
+            Span::styled("Update available: ", colors.text()),
+            Span::styled(
+                format!("v{}", latest),
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(" (current: ", colors.text_muted()),
+            Span::styled(format!("v{})", crate::VERSION), colors.text_muted()),
+            Span::styled(" — Press ", colors.text_muted()),
+            Span::styled(
+                "[U]",
+                Style::default()
+                    .fg(colors.primary)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(format!(" to update via {}", pm.name()), colors.text_muted()),
+        ]))
+        .alignment(Alignment::Center)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_type(BorderType::Rounded)
+                .border_style(Style::default().fg(Color::Yellow))
+                .style(Style::default().bg(colors.bg)),
+        );
+
+        frame.render_widget(banner, area);
     }
 }
 
