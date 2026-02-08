@@ -1391,26 +1391,48 @@ fn render_updating_overlay(frame: &mut Frame, state: &AppState) {
     let colors = state.theme.colors();
     let area = frame.area();
 
+    // Dim the background with semi-transparent overlay
+    let overlay = Block::default().style(Style::default().bg(Color::Black));
+    frame.render_widget(overlay, area);
+
+    // Centered modal
     let popup_width = 40u16;
     let popup_height = 5u16;
+
+    // Calculate centered position
+    let x = area.width.saturating_sub(popup_width) / 2;
+    let y = area.height.saturating_sub(popup_height) / 2;
+
     let popup_area = Rect {
-        x: area.width.saturating_sub(popup_width) / 2,
-        y: area.height.saturating_sub(popup_height) / 2,
-        width: popup_width.min(area.width),
-        height: popup_height.min(area.height),
+        x,
+        y,
+        width: popup_width.min(area.width.saturating_sub(x)),
+        height: popup_height.min(area.height.saturating_sub(y)),
     };
 
+    // Clear the popup area first to ensure clean rendering
     frame.render_widget(Clear, popup_area);
 
-    let msg = state.update_status.as_deref().unwrap_or("Updating...");
+    let msg = state
+        .update_status
+        .as_deref()
+        .unwrap_or("Updating... please wait");
 
-    let paragraph = Paragraph::new(vec![
+    let text = vec![
         Line::from(""),
-        Line::from(Span::styled(msg, colors.text())),
-    ])
-    .alignment(Alignment::Center)
-    .block(
+        Line::from(Span::styled(
+            format!("⏳ {}", msg),
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        )),
+        Line::from(""),
+    ];
+
+    let paragraph = Paragraph::new(text).alignment(Alignment::Center).block(
         Block::default()
+            .title(" Update in Progress ")
+            .title_alignment(Alignment::Center)
             .borders(Borders::ALL)
             .border_type(BorderType::Rounded)
             .border_style(Style::default().fg(Color::Yellow))

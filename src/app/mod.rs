@@ -123,14 +123,15 @@ fn run_app(
             handle_async_result(state, result);
         }
 
-        // Process pending update if flagged
-        if state.pending_update {
-            events::process_pending_update(state);
-            terminal.draw(|frame| ui::render(frame, state))?;
-        }
-
         // Draw UI
         terminal.draw(|frame| ui::render(frame, state))?;
+
+        // Process pending update after draw (so "Updating..." is visible)
+        if state.pending_update {
+            events::process_pending_update(state);
+            // Redraw immediately after update completes
+            terminal.draw(|frame| ui::render(frame, state))?;
+        }
 
         // Handle events
         if event::poll(Duration::from_millis(50))?
