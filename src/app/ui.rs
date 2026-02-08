@@ -620,8 +620,12 @@ fn render_help_popup(frame: &mut Frame, state: &AppState) {
             Span::styled("Toggle Bluesky", colors.text()),
         ]),
         Line::from(vec![
-            Span::styled("  Tab              ", colors.key_hint()),
+            Span::styled("  Enter            ", colors.key_hint()),
             Span::styled("Send post", colors.text()),
+        ]),
+        Line::from(vec![
+            Span::styled("  Shift+Enter      ", colors.key_hint()),
+            Span::styled("New line", colors.text()),
         ]),
         Line::from(vec![
             Span::styled("  Esc              ", colors.key_hint()),
@@ -897,8 +901,10 @@ fn render_compose_popup(frame: &mut Frame, state: &AppState) {
         Span::styled("/", colors.text_dim()),
         Span::styled("F2", colors.key_hint()),
         Span::styled(" toggle  ", colors.text_dim()),
-        Span::styled("Tab", colors.key_hint()),
+        Span::styled("Enter", colors.key_hint()),
         Span::styled(" send  ", colors.text_dim()),
+        Span::styled("Shift+Enter", colors.key_hint()),
+        Span::styled(" newline  ", colors.text_dim()),
         Span::styled("Esc", colors.key_hint()),
         Span::styled(" cancel", colors.text_dim()),
     ]));

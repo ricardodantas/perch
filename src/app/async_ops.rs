@@ -399,7 +399,7 @@ async fn handle_post(
     let action = if reply_to.is_some() { "Replying..." } else { "Posting..." };
     let _ = result_tx
         .send(AsyncResult::Status {
-            message: action.to_string(),
+            message: format!("{} (to {} accounts)", action, accounts.len()),
         })
         .await;
 
@@ -408,15 +408,13 @@ async fn handle_post(
 
     for account in &accounts {
         let token = match auth::get_credentials(account) {
-            Ok(Some(t)) => {
-                t
-            },
+            Ok(Some(t)) => t,
             Ok(None) => {
-                errors.push(format!("No credentials for {}", account.network.name()));
+                errors.push(format!("No credentials for {} (@{})", account.network.name(), account.handle));
                 continue;
             }
-            _ => {
-                errors.push(format!("No credentials for {}", account.network.name()));
+            Err(e) => {
+                errors.push(format!("Auth error for {}: {}", account.network.name(), e));
                 continue;
             }
         };
