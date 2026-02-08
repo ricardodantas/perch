@@ -537,6 +537,10 @@ fn render_help_popup(frame: &mut Frame, state: &AppState) {
             Span::styled("Switch between views", colors.text()),
         ]),
         Line::from(vec![
+            Span::styled("  1/2              ", colors.key_hint()),
+            Span::styled("Jump to Timeline/Accounts", colors.text()),
+        ]),
+        Line::from(vec![
             Span::styled("  h/l or ←/→       ", colors.key_hint()),
             Span::styled("Switch panels", colors.text()),
         ]),
@@ -628,8 +632,42 @@ fn render_help_popup(frame: &mut Frame, state: &AppState) {
             Span::styled("New line", colors.text()),
         ]),
         Line::from(vec![
+            Span::styled("  Backspace        ", colors.key_hint()),
+            Span::styled("Delete character", colors.text()),
+        ]),
+        Line::from(vec![
             Span::styled("  Esc              ", colors.key_hint()),
             Span::styled("Cancel", colors.text()),
+        ]),
+        Line::from(""),
+        Line::from(vec![Span::styled(
+            "  Search",
+            colors.text_primary().add_modifier(Modifier::BOLD),
+        )]),
+        Line::from(vec![
+            Span::styled("  Enter            ", colors.key_hint()),
+            Span::styled("Execute search", colors.text()),
+        ]),
+        Line::from(vec![
+            Span::styled("  Esc              ", colors.key_hint()),
+            Span::styled("Cancel", colors.text()),
+        ]),
+        Line::from(""),
+        Line::from(vec![Span::styled(
+            "  Accounts View",
+            colors.text_primary().add_modifier(Modifier::BOLD),
+        )]),
+        Line::from(vec![
+            Span::styled("  d                ", colors.key_hint()),
+            Span::styled("Set as default account", colors.text()),
+        ]),
+        Line::from(vec![
+            Span::styled("  D                ", colors.key_hint()),
+            Span::styled("Delete account", colors.text()),
+        ]),
+        Line::from(vec![
+            Span::styled("  Enter            ", colors.key_hint()),
+            Span::styled("View account's timeline", colors.text()),
         ]),
         Line::from(""),
         Line::from(vec![Span::styled(
