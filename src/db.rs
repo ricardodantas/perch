@@ -6,7 +6,7 @@ use rusqlite::{Connection, params};
 use std::path::PathBuf;
 use uuid::Uuid;
 
-use crate::models::{Account, Network, Post};
+use crate::models::{Account, Network, Post, ScheduledPost, ScheduledPostStatus};
 use crate::paths;
 
 /// Database connection wrapper
@@ -387,6 +387,122 @@ impl Database {
         let cutoff = Utc::now() - chrono::Duration::hours(max_age_hours as i64);
         let count = self.conn.execute(
             "DELETE FROM post_cache WHERE cached_at < ?1",
+            params![cutoff.to_rfc3339()],
+        )?;
+        Ok(count)
+    }
+
+    // ==================== Scheduled Posts ====================
+
+    /// Save a scheduled post
+    pub fn save_scheduled_post(&self, post: &ScheduledPost) -> Result<()> {
+        self.conn.execute(
+            r"INSERT INTO scheduled_posts (id, content, networks, scheduled_for, status, error, created_at)
+               VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            params![
+                post.id.to_string(),
+                post.content,
+                post.networks_str(),
+                post.scheduled_for.to_rfc3339(),
+                post.status.as_str(),
+                post.error,
+                post.created_at.to_rfc3339(),
+            ],
+        )?;
+        Ok(())
+    }
+
+    /// Get all scheduled posts (sorted by scheduled time)
+    pub fn get_scheduled_posts(&self) -> Result<Vec<ScheduledPost>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, content, networks, scheduled_for, status, error, created_at
+             FROM scheduled_posts ORDER BY scheduled_for ASC",
+        )?;
+
+        let posts = stmt.query_map([], Self::row_to_scheduled_post)?;
+        posts.collect::<Result<Vec<_>, _>>().map_err(Into::into)
+    }
+
+    /// Get pending scheduled posts that are due
+    pub fn get_due_scheduled_posts(&self) -> Result<Vec<ScheduledPost>> {
+        let now = Utc::now().to_rfc3339();
+        let mut stmt = self.conn.prepare(
+            "SELECT id, content, networks, scheduled_for, status, error, created_at
+             FROM scheduled_posts 
+             WHERE status = 'pending' AND scheduled_for <= ?1
+             ORDER BY scheduled_for ASC",
+        )?;
+
+        let posts = stmt.query_map(params![now], Self::row_to_scheduled_post)?;
+        posts.collect::<Result<Vec<_>, _>>().map_err(Into::into)
+    }
+
+    /// Get pending scheduled posts (not yet posted)
+    pub fn get_pending_scheduled_posts(&self) -> Result<Vec<ScheduledPost>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, content, networks, scheduled_for, status, error, created_at
+             FROM scheduled_posts 
+             WHERE status = 'pending'
+             ORDER BY scheduled_for ASC",
+        )?;
+
+        let posts = stmt.query_map([], Self::row_to_scheduled_post)?;
+        posts.collect::<Result<Vec<_>, _>>().map_err(Into::into)
+    }
+
+    /// Update scheduled post status
+    pub fn update_scheduled_post_status(
+        &self,
+        id: Uuid,
+        status: ScheduledPostStatus,
+        error: Option<&str>,
+    ) -> Result<()> {
+        self.conn.execute(
+            "UPDATE scheduled_posts SET status = ?2, error = ?3 WHERE id = ?1",
+            params![id.to_string(), status.as_str(), error],
+        )?;
+        Ok(())
+    }
+
+    /// Delete a scheduled post
+    pub fn delete_scheduled_post(&self, id: Uuid) -> Result<()> {
+        self.conn.execute(
+            "DELETE FROM scheduled_posts WHERE id = ?1",
+            params![id.to_string()],
+        )?;
+        Ok(())
+    }
+
+    /// Cancel a scheduled post (sets status to cancelled)
+    pub fn cancel_scheduled_post(&self, id: Uuid) -> Result<()> {
+        self.update_scheduled_post_status(id, ScheduledPostStatus::Cancelled, None)
+    }
+
+    /// Helper to convert a row to `ScheduledPost`
+    fn row_to_scheduled_post(row: &rusqlite::Row<'_>) -> rusqlite::Result<ScheduledPost> {
+        let networks_str: String = row.get(2)?;
+        let status_str: String = row.get(4)?;
+
+        Ok(ScheduledPost {
+            id: Uuid::parse_str(&row.get::<_, String>(0)?).unwrap(),
+            content: row.get(1)?,
+            networks: ScheduledPost::networks_from_str(&networks_str),
+            scheduled_for: DateTime::parse_from_rfc3339(&row.get::<_, String>(3)?)
+                .unwrap()
+                .with_timezone(&Utc),
+            status: ScheduledPostStatus::from_str(&status_str).unwrap_or_default(),
+            error: row.get(5)?,
+            created_at: DateTime::parse_from_rfc3339(&row.get::<_, String>(6)?)
+                .unwrap()
+                .with_timezone(&Utc),
+        })
+    }
+
+    /// Clear old completed/failed/cancelled scheduled posts
+    pub fn clear_old_scheduled_posts(&self, max_age_hours: u64) -> Result<usize> {
+        let cutoff = Utc::now() - chrono::Duration::hours(max_age_hours as i64);
+        let count = self.conn.execute(
+            "DELETE FROM scheduled_posts WHERE status IN ('posted', 'failed', 'cancelled') AND created_at < ?1",
             params![cutoff.to_rfc3339()],
         )?;
         Ok(count)

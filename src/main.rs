@@ -20,8 +20,17 @@ fn main() -> Result<()> {
         Command::Auth { network, instance } => {
             tokio::runtime::Runtime::new()?.block_on(auth_flow(&network, instance.as_deref()))
         }
-        Command::Post { content, networks } => {
-            tokio::runtime::Runtime::new()?.block_on(post_cli(&content, &networks))
+        Command::Post {
+            content,
+            networks,
+            schedule,
+        } => tokio::runtime::Runtime::new()?.block_on(post_cli(
+            &content,
+            &networks,
+            schedule.as_deref(),
+        )),
+        Command::Schedule { subcommand } => {
+            tokio::runtime::Runtime::new()?.block_on(schedule_cli(subcommand))
         }
         Command::Timeline { network, limit } => {
             tokio::runtime::Runtime::new()?.block_on(timeline_cli(network.as_deref(), limit))
@@ -49,6 +58,10 @@ enum Command {
     Post {
         content: String,
         networks: Vec<String>,
+        schedule: Option<String>,
+    },
+    Schedule {
+        subcommand: ScheduleSubcommand,
     },
     Timeline {
         network: Option<String>,
@@ -57,6 +70,13 @@ enum Command {
     Accounts,
     Help,
     Version,
+}
+
+/// Schedule subcommands
+enum ScheduleSubcommand {
+    List,
+    Cancel { id: String },
+    Run,
 }
 
 fn parse_args() -> Result<Command> {
@@ -86,17 +106,25 @@ fn parse_args() -> Result<Command> {
                 .ok_or_else(|| anyhow::anyhow!("Missing post content"))?
                 .clone();
 
-            // Parse --to flag
+            // Parse flags
             let mut networks = Vec::new();
+            let mut schedule = None;
             let mut i = 3;
             while i < args.len() {
-                if args[i] == "--to" || args[i] == "-t" {
-                    if let Some(nets) = args.get(i + 1) {
-                        networks.extend(nets.split(',').map(String::from));
+                match args[i].as_str() {
+                    "--to" | "-t" => {
+                        if let Some(nets) = args.get(i + 1) {
+                            networks.extend(nets.split(',').map(String::from));
+                        }
+                        i += 2;
                     }
-                    i += 2;
-                } else {
-                    i += 1;
+                    "--schedule" | "-s" | "--at" => {
+                        if let Some(time) = args.get(i + 1) {
+                            schedule = Some(time.clone());
+                        }
+                        i += 2;
+                    }
+                    _ => i += 1,
                 }
             }
 
@@ -105,7 +133,32 @@ fn parse_args() -> Result<Command> {
                 networks = vec!["mastodon".to_string(), "bluesky".to_string()];
             }
 
-            Ok(Command::Post { content, networks })
+            Ok(Command::Post {
+                content,
+                networks,
+                schedule,
+            })
+        }
+
+        "schedule" | "scheduled" => {
+            let subcommand = match args.get(2).map(String::as_str) {
+                Some("list" | "ls") | None => ScheduleSubcommand::List,
+                Some("cancel" | "rm" | "delete") => {
+                    let id = args
+                        .get(3)
+                        .ok_or_else(|| anyhow::anyhow!("Missing post ID to cancel"))?
+                        .clone();
+                    ScheduleSubcommand::Cancel { id }
+                }
+                Some("run" | "process") => ScheduleSubcommand::Run,
+                Some(other) => {
+                    return Err(anyhow::anyhow!(
+                        "Unknown schedule subcommand: {}\nTry: list, cancel, run",
+                        other
+                    ));
+                }
+            };
+            Ok(Command::Schedule { subcommand })
         }
 
         "timeline" | "tl" => {
@@ -148,10 +201,23 @@ COMMANDS:
     post <content> [OPTIONS]           Post to networks
       Options:
         -t, --to <networks>            Comma-separated networks (default: all)
+        -s, --schedule <time>          Schedule post for later
       Examples:
         perch post "Hello world!"
         perch post "Hello Fediverse!" --to mastodon
         perch post "Hello!" --to mastodon,bluesky
+        perch post "Good morning!" --schedule "in 2h"
+        perch post "Scheduled!" --schedule "2026-02-08 15:00"
+
+    schedule [SUBCOMMAND]              Manage scheduled posts
+      Subcommands:
+        list                           List pending scheduled posts
+        cancel <id>                    Cancel a scheduled post
+        run                            Process due scheduled posts
+      Examples:
+        perch schedule list
+        perch schedule cancel abc123
+        perch schedule run
 
     timeline [network] [OPTIONS]       Show timeline
       Options:
@@ -161,6 +227,11 @@ COMMANDS:
         perch timeline mastodon --limit 50
 
     accounts                           List configured accounts
+
+SCHEDULE TIME FORMATS:
+    Relative:    "in 5m", "in 2h", "in 1d", "in 30 minutes"
+    Time today:  "15:00", "3pm" (schedules for tomorrow if past)
+    Date+time:   "2026-02-08 15:00", "2026-02-08T15:00"
 
 OPTIONS:
     -h, --help                         Show this help message
@@ -335,18 +406,51 @@ async fn auth_flow(network: &str, instance: Option<&str>) -> Result<()> {
     Ok(())
 }
 
-async fn post_cli(content: &str, networks: &[String]) -> Result<()> {
+async fn post_cli(content: &str, networks: &[String], schedule: Option<&str>) -> Result<()> {
     let db = perch::Database::open()?;
 
-    for network_name in networks {
-        let network = perch::Network::from_str(network_name)
-            .ok_or_else(|| anyhow::anyhow!("Unknown network: {}", network_name))?;
+    // Parse networks
+    let parsed_networks: Vec<perch::Network> = networks
+        .iter()
+        .filter_map(|n| perch::Network::from_str(n))
+        .collect();
 
-        let account = db.get_default_account(network)?.ok_or_else(|| {
+    if parsed_networks.is_empty() {
+        return Err(anyhow::anyhow!("No valid networks specified"));
+    }
+
+    // If scheduling, save to database instead of posting
+    if let Some(schedule_time) = schedule {
+        let scheduled_for = perch::schedule::parse_schedule_time(schedule_time)?;
+        let scheduled_post =
+            perch::ScheduledPost::new(content, parsed_networks.clone(), scheduled_for);
+
+        db.save_scheduled_post(&scheduled_post)?;
+
+        let networks_str = parsed_networks
+            .iter()
+            .map(perch::Network::name)
+            .collect::<Vec<_>>()
+            .join(", ");
+
+        println!("📅 Post scheduled!");
+        println!("   Networks: {}", networks_str);
+        println!("   Time: {}", scheduled_post.scheduled_time_display());
+        println!("   In: {}", scheduled_post.time_until());
+        println!("\n   ID: {}", &scheduled_post.id.to_string()[..8]);
+        println!("\n   Run 'perch schedule list' to see pending posts");
+        println!("   Run 'perch schedule run' to process due posts");
+
+        return Ok(());
+    }
+
+    // Post immediately
+    for network in &parsed_networks {
+        let account = db.get_default_account(*network)?.ok_or_else(|| {
             anyhow::anyhow!(
                 "No {} account configured. Run: perch auth {}",
                 network.name(),
-                network_name
+                format!("{:?}", network).to_lowercase()
             )
         })?;
 
@@ -366,6 +470,195 @@ async fn post_cli(content: &str, networks: &[String]) -> Result<()> {
     }
 
     Ok(())
+}
+
+/// Handle schedule subcommands
+async fn schedule_cli(subcommand: ScheduleSubcommand) -> Result<()> {
+    let db = perch::Database::open()?;
+
+    match subcommand {
+        ScheduleSubcommand::List => {
+            let posts = db.get_pending_scheduled_posts()?;
+
+            if posts.is_empty() {
+                println!("No scheduled posts.");
+                println!("\nSchedule a post with:");
+                println!("  perch post \"Your message\" --schedule \"in 2h\"");
+                return Ok(());
+            }
+
+            println!("📅 Scheduled Posts\n");
+
+            for post in posts {
+                let networks_str = post
+                    .networks
+                    .iter()
+                    .map(|n| format!("{} {}", n.emoji(), n.name()))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+
+                let id_short = &post.id.to_string()[..8];
+
+                println!("{} [{}]", post.status.emoji(), id_short);
+                println!("   \"{}\"", truncate_content(&post.content, 60));
+                println!("   To: {}", networks_str);
+                println!(
+                    "   At: {} (in {})",
+                    post.scheduled_time_display(),
+                    post.time_until()
+                );
+                println!();
+            }
+        }
+
+        ScheduleSubcommand::Cancel { id } => {
+            // Find post by ID prefix
+            let posts = db.get_pending_scheduled_posts()?;
+            let matching: Vec<_> = posts
+                .iter()
+                .filter(|p| p.id.to_string().starts_with(&id))
+                .collect();
+
+            match matching.len() {
+                0 => {
+                    return Err(anyhow::anyhow!(
+                        "No scheduled post found with ID starting with '{}'",
+                        id
+                    ));
+                }
+                1 => {
+                    let post = matching[0];
+                    db.cancel_scheduled_post(post.id)?;
+                    println!("🚫 Cancelled scheduled post: {}", &post.id.to_string()[..8]);
+                    println!("   \"{}\"", truncate_content(&post.content, 50));
+                }
+                _ => {
+                    println!("Multiple posts match '{}'. Please be more specific:", id);
+                    for post in matching {
+                        println!(
+                            "  {} - \"{}\"",
+                            &post.id.to_string()[..8],
+                            truncate_content(&post.content, 40)
+                        );
+                    }
+                }
+            }
+        }
+
+        ScheduleSubcommand::Run => {
+            let due_posts = db.get_due_scheduled_posts()?;
+
+            if due_posts.is_empty() {
+                println!("No scheduled posts are due.");
+                return Ok(());
+            }
+
+            println!("📤 Processing {} scheduled post(s)...\n", due_posts.len());
+
+            for post in due_posts {
+                let id_short = &post.id.to_string()[..8];
+                println!(
+                    "Processing [{}]: \"{}\"",
+                    id_short,
+                    truncate_content(&post.content, 40)
+                );
+
+                // Mark as posting
+                db.update_scheduled_post_status(
+                    post.id,
+                    perch::ScheduledPostStatus::Posting,
+                    None,
+                )?;
+
+                let mut success = true;
+                let mut error_msg = String::new();
+
+                for network in &post.networks {
+                    let account = if let Some(a) = db.get_default_account(*network)? {
+                        a
+                    } else {
+                        let msg = format!("No {} account configured", network.name());
+                        println!("  ⚠️  {}", msg);
+                        error_msg = msg;
+                        success = false;
+                        continue;
+                    };
+
+                    let token = if let Some(t) = perch::auth::get_credentials(&account)? {
+                        t
+                    } else {
+                        let msg = format!("No credentials for {}", account.handle);
+                        println!("  ⚠️  {}", msg);
+                        error_msg = msg;
+                        success = false;
+                        continue;
+                    };
+
+                    match perch::api::get_client(&account, &token).await {
+                        Ok(client) => match client.post(&post.content).await {
+                            Ok(posted) => {
+                                if let Some(url) = &posted.url {
+                                    println!(
+                                        "  {} ✓ Posted to {}: {}",
+                                        network.emoji(),
+                                        network.name(),
+                                        url
+                                    );
+                                } else {
+                                    println!(
+                                        "  {} ✓ Posted to {}",
+                                        network.emoji(),
+                                        network.name()
+                                    );
+                                }
+                            }
+                            Err(e) => {
+                                let msg = format!("Failed to post to {}: {}", network.name(), e);
+                                println!("  {} ✗ {}", network.emoji(), msg);
+                                error_msg = msg;
+                                success = false;
+                            }
+                        },
+                        Err(e) => {
+                            let msg = format!("Failed to connect to {}: {}", network.name(), e);
+                            println!("  {} ✗ {}", network.emoji(), msg);
+                            error_msg = msg;
+                            success = false;
+                        }
+                    }
+                }
+
+                // Update status
+                if success {
+                    db.update_scheduled_post_status(
+                        post.id,
+                        perch::ScheduledPostStatus::Posted,
+                        None,
+                    )?;
+                    println!("  ✅ Done\n");
+                } else {
+                    db.update_scheduled_post_status(
+                        post.id,
+                        perch::ScheduledPostStatus::Failed,
+                        Some(&error_msg),
+                    )?;
+                    println!("  ❌ Failed\n");
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// Truncate content for display
+fn truncate_content(content: &str, max_len: usize) -> String {
+    let content = content.replace('\n', " ");
+    if content.len() <= max_len {
+        content
+    } else {
+        format!("{}...", &content[..max_len - 3])
+    }
 }
 
 async fn timeline_cli(network: Option<&str>, limit: usize) -> Result<()> {

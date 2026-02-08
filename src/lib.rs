@@ -105,6 +105,7 @@ pub mod db;
 pub mod demo;
 pub mod models;
 pub mod paths;
+pub mod schedule;
 pub mod sync;
 pub mod theme;
 pub mod update;
@@ -113,7 +114,7 @@ pub mod update;
 pub use app::AppState;
 pub use config::Config;
 pub use db::Database;
-pub use models::{Account, Network, Post};
+pub use models::{Account, Network, Post, ScheduledPost, ScheduledPostStatus};
 pub use theme::{Theme, ThemeColors};
 pub use update::{
     PackageManager, VersionCheck, check_for_updates_crates_io, detect_package_manager, run_update,
