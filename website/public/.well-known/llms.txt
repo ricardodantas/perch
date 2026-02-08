@@ -1,0 +1,172 @@
+# Perch
+
+> A beautiful terminal social client for Mastodon & Bluesky
+
+Perch is a Rust-based terminal application for browsing and posting to decentralized social networks. Read your timeline, post updates, and engage with content across Mastodon and Bluesky — all from a gorgeous TUI.
+
+## Quick Facts
+
+- **Type:** Command-line application / TUI
+- **Language:** Rust
+- **License:** MIT
+- **Platforms:** macOS, Linux, Windows
+- **Repository:** https://github.com/ricardodantas/perch
+- **Documentation:** https://perch.ricardodantas.me/docs
+- **Author:** Ricardo Dantas
+- **Themes:** 15 built-in color themes
+
+## Installation
+
+### Homebrew (macOS/Linux)
+```bash
+brew install ricardodantas/tap/perch
+```
+
+### Cargo (all platforms)
+```bash
+cargo install perch
+```
+
+### Binary Downloads
+Pre-built binaries available at: https://github.com/ricardodantas/perch/releases
+
+## Key Features
+
+- **Mastodon Integration**: Full OAuth authentication with any instance
+- **Bluesky Support**: AT Protocol support with app passwords
+- **Cross-Posting**: Post to multiple networks simultaneously
+- **Beautiful TUI**: Three-panel interface with 15 color themes
+- **Vim Keybindings**: Navigate with familiar j/k, tabs, and shortcuts
+- **Secure Storage**: Credentials stored in system keyring
+- **Offline Cache**: Browse cached posts without network
+- **Auto-Update**: Built-in update checker with one-key update
+
+## Architecture
+
+Perch supports two modes:
+- **TUI Mode**: Interactive terminal interface for browsing and posting
+- **CLI Mode**: Script-friendly commands for automation
+
+## Usage
+
+```bash
+# Add a Mastodon account
+perch auth mastodon mastodon.social
+
+# Add a Bluesky account
+perch auth bluesky
+
+# Launch the TUI
+perch
+
+# Post from CLI
+perch post "Hello world!"
+
+# View timeline in CLI
+perch timeline
+```
+
+## Configuration
+
+Config file: `~/.config/perch/config.toml`
+
+### Example Configuration
+
+```toml
+# Theme (15 options available)
+theme = "dracula"
+
+# Default post visibility
+default_visibility = "public"
+
+# Default networks to post to
+default_networks = ["mastodon", "bluesky"]
+
+# Number of posts to fetch
+post_limit = 50
+```
+
+## Supported Networks
+
+### Mastodon
+- OAuth authentication
+- Any instance supported
+- Home timeline, notifications
+- Post, reply, like, boost
+- Content warnings
+
+### Bluesky
+- App password authentication
+- AT Protocol support
+- Home timeline
+- Post, reply, like, repost
+
+## Themes
+
+15 themes available:
+- Catppuccin (Mocha, Latte)
+- Dracula, Nord, Gruvbox Dark/Light
+- Tokyo Night, Monokai Pro
+- Solarized Dark/Light, One Dark Pro
+- Everforest, Rosé Pine, Kanagawa, Cyberpunk
+
+## Keyboard Shortcuts (TUI)
+
+### Navigation
+- `j`/`k` or `↑`/`↓`: Navigate items
+- `h`/`l` or `←`/`→`: Switch panels
+- `Tab`: Switch views
+- `1`/`2`: Jump to Timeline/Accounts
+- `g`/`G`: Go to first/last
+
+### Timeline Actions
+- `n`: Compose new post
+- `R`: Reply to post
+- `r`: Repost/unrepost
+- `L`: Like/unlike
+- `b`: Refresh
+- `o`: Open in browser
+- `f`: Cycle network filter
+- `/`: Search
+
+### Compose
+- `F1`/`F2`: Toggle Mastodon/Bluesky
+- `Ctrl+S`: Send post
+- `Enter`: New line
+- `Esc`: Cancel
+
+### General
+- `t`: Theme picker
+- `?`: Help
+- `A`: About
+- `U`: Update (if available)
+- `q`: Quit
+
+## CLI Commands
+
+```bash
+# Posting
+perch post "Hello world!"
+perch post "Hello Fediverse!" --to mastodon
+perch post "Spoilers!" --cw "Movie spoilers"
+
+# Timeline
+perch timeline
+perch timeline mastodon
+perch timeline --limit 50
+
+# Accounts
+perch accounts
+perch accounts remove <id>
+
+# Authentication
+perch auth mastodon <instance>
+perch auth bluesky
+```
+
+## Links
+
+- Website: https://perch.ricardodantas.me
+- GitHub: https://github.com/ricardodantas/perch
+- Issues: https://github.com/ricardodantas/perch/issues
+- Crates.io: https://crates.io/crates/perch

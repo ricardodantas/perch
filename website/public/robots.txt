@@ -1,6 +1,12 @@
-# https://www.robotstxt.org/robotstxt.html
+# Perch - Terminal Social Client for Mastodon & Bluesky
+# https://perch.ricardodantas.me
+
 User-agent: *
 Allow: /
 
 # Sitemap
 Sitemap: https://perch.ricardodantas.me/sitemap.xml
+
+# AI/LLM agents
+# See llms.txt for structured information about this software
+# https://perch.ricardodantas.me/llms.txt
