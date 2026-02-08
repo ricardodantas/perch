@@ -910,21 +910,25 @@ fn render_compose_popup(frame: &mut Frame, state: &AppState) {
     ]));
     content.push(Line::from(""));
     
-    content.push(Line::from(vec![
-        Span::styled("  ", Style::default()),
-        Span::styled(
-            if state.compose_text.is_empty() {
-                if state.reply_to.is_some() { "Write your reply..." } else { "What's on your mind?" }
-            } else {
-                &state.compose_text
-            },
-            if state.compose_text.is_empty() {
-                colors.text_muted()
-            } else {
-                colors.text()
-            },
-        ),
-    ]));
+    // Display compose text - handle multiple lines
+    if state.compose_text.is_empty() {
+        content.push(Line::from(vec![
+            Span::styled("  ", Style::default()),
+            Span::styled(
+                if state.reply_to.is_some() { "Write your reply..." } else { "What's on your mind?" },
+                colors.text_muted(),
+            ),
+        ]));
+    } else {
+        // Split text by newlines and render each line
+        for line in state.compose_text.split('\n') {
+            content.push(Line::from(vec![
+                Span::styled("  ", Style::default()),
+                Span::styled(line.to_string(), colors.text()),
+            ]));
+        }
+    }
+    
     content.push(Line::from(""));
     content.push(Line::from(vec![
         Span::styled(format!("  {}/{}", char_count, max_chars), 
@@ -954,8 +958,14 @@ fn render_compose_popup(frame: &mut Frame, state: &AppState) {
     // Show cursor position - adjust for reply context and network line
     let reply_offset = if state.reply_to.is_some() { 2u16 } else { 0 };
     let network_offset = 3u16; // network pills + hint line + empty line
-    let cursor_x = popup_area.x + 3 + state.compose_text.lines().last().map(|l| l.len()).unwrap_or(0) as u16;
-    let cursor_y = popup_area.y + 2 + reply_offset + network_offset + state.compose_text.lines().count().saturating_sub(1) as u16;
+    
+    // Count lines properly - split('\n') includes empty trailing line
+    let text_lines: Vec<&str> = state.compose_text.split('\n').collect();
+    let line_count = text_lines.len();
+    let last_line_len = text_lines.last().map(|l| l.len()).unwrap_or(0);
+    
+    let cursor_x = popup_area.x + 3 + last_line_len as u16;
+    let cursor_y = popup_area.y + 2 + reply_offset + network_offset + (line_count.saturating_sub(1)) as u16;
     if cursor_x < popup_area.x + popup_area.width - 1 && cursor_y < popup_area.y + popup_area.height - 2 {
         frame.set_cursor_position((cursor_x, cursor_y));
     }
