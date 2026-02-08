@@ -25,8 +25,8 @@ Screenshot screenshots/02-help.png
 Escape
 Sleep 500ms
 
-# Open theme picker
-Type "T"
+# Open theme picker (lowercase t)
+Type "t"
 Sleep 1s
 Screenshot screenshots/03-theme-picker.png
 
@@ -43,7 +43,7 @@ Sleep 500ms
 Screenshot screenshots/05-nord-theme.png
 
 # Back to Catppuccin - open theme picker again
-Type "T"
+Type "t"
 Sleep 500ms
 Down
 Down
