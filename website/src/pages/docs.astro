@@ -1,0 +1,671 @@
+---
+import Layout from '../layouts/Layout.astro';
+
+const baseUrl = import.meta.env.BASE_URL;
+---
+
+<Layout title="Documentation - Perch">
+  <div class="docs-layout">
+    <aside class="docs-sidebar">
+      <nav class="docs-nav">
+        <h3>Getting Started</h3>
+        <ul>
+          <li><a href="#installation">Installation</a></li>
+          <li><a href="#quick-start">Quick Start</a></li>
+          <li><a href="#authentication">Authentication</a></li>
+        </ul>
+
+        <h3>Usage</h3>
+        <ul>
+          <li><a href="#tui">TUI Mode</a></li>
+          <li><a href="#cli">CLI Commands</a></li>
+          <li><a href="#posting">Posting</a></li>
+        </ul>
+
+        <h3>Keybindings</h3>
+        <ul>
+          <li><a href="#navigation">Navigation</a></li>
+          <li><a href="#timeline">Timeline Actions</a></li>
+          <li><a href="#compose">Compose</a></li>
+        </ul>
+
+        <h3>Configuration</h3>
+        <ul>
+          <li><a href="#config-file">Config File</a></li>
+          <li><a href="#themes">Themes</a></li>
+        </ul>
+      </nav>
+    </aside>
+
+    <div class="docs-content">
+      <div class="docs-header">
+        <h1>Documentation</h1>
+        <p>Everything you need to know about using Perch to browse Mastodon and Bluesky.</p>
+      </div>
+
+      <section id="installation">
+        <h2>Installation</h2>
+
+        <h3>macOS</h3>
+        <div class="code-block">
+          <div class="code-header">
+            <span>Homebrew</span>
+            <button class="copy-btn" data-copy="brew install ricardodantas/tap/perch">Copy</button>
+          </div>
+          <pre><code>brew install ricardodantas/tap/perch</code></pre>
+        </div>
+
+        <h3>Linux / Windows</h3>
+        <div class="code-block">
+          <div class="code-header">
+            <span>Cargo</span>
+            <button class="copy-btn" data-copy="cargo install perch">Copy</button>
+          </div>
+          <pre><code>cargo install perch</code></pre>
+        </div>
+
+        <h3>From Source</h3>
+        <div class="code-block">
+          <div class="code-header">
+            <span>Build from source</span>
+            <button class="copy-btn" data-copy="git clone https://github.com/ricardodantas/perch.git
+cd perch
+cargo build --release">Copy</button>
+          </div>
+          <pre><code>git clone https://github.com/ricardodantas/perch.git
+cd perch
+cargo build --release</code></pre>
+        </div>
+
+        <h3>Requirements</h3>
+        <ul>
+          <li>Rust 1.93+ (only for Cargo/source installation)</li>
+          <li>macOS, Linux, or Windows</li>
+        </ul>
+      </section>
+
+      <section id="quick-start">
+        <h2>Quick Start</h2>
+        <div class="numbered-steps">
+          <div class="numbered-step">
+            <span class="number">1</span>
+            <div>
+              <h4>Install Perch</h4>
+              <div class="code-block inline">
+                <pre><code>cargo install perch</code></pre>
+                <button class="copy-btn small" data-copy="cargo install perch">Copy</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="numbered-step">
+            <span class="number">2</span>
+            <div>
+              <h4>Add a Mastodon account</h4>
+              <div class="code-block inline">
+                <pre><code>perch auth mastodon mastodon.social</code></pre>
+                <button class="copy-btn small" data-copy="perch auth mastodon mastodon.social">Copy</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="numbered-step">
+            <span class="number">3</span>
+            <div>
+              <h4>Or add a Bluesky account</h4>
+              <div class="code-block inline">
+                <pre><code>perch auth bluesky</code></pre>
+                <button class="copy-btn small" data-copy="perch auth bluesky">Copy</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="numbered-step">
+            <span class="number">4</span>
+            <div>
+              <h4>Launch the TUI</h4>
+              <div class="code-block inline">
+                <pre><code>perch</code></pre>
+                <button class="copy-btn small" data-copy="perch">Copy</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="authentication">
+        <h2>Authentication</h2>
+
+        <h3>🐘 Mastodon (OAuth)</h3>
+        <div class="code-block">
+          <pre><code>perch auth mastodon &lt;instance&gt;</code></pre>
+        </div>
+        <p>This will:</p>
+        <ol>
+          <li>Register Perch with your Mastodon instance</li>
+          <li>Open your browser for authorization</li>
+          <li>Ask you to paste the authorization code</li>
+          <li>Store credentials securely in your system keyring</li>
+        </ol>
+        <p><strong>Examples:</strong></p>
+        <div class="code-block">
+          <pre><code>perch auth mastodon mastodon.social
+perch auth mastodon fosstodon.org
+perch auth mastodon hachyderm.io</code></pre>
+        </div>
+
+        <h3>🦋 Bluesky (App Password)</h3>
+        <div class="code-block">
+          <pre><code>perch auth bluesky</code></pre>
+        </div>
+        <p>You'll need an <a href="https://bsky.app/settings/app-passwords" target="_blank" rel="noopener">App Password</a> from Bluesky settings.</p>
+        <div class="callout info">
+          <strong>💡 Tip:</strong> App passwords are more secure than your main password — they can be revoked individually and don't have full account access.
+        </div>
+      </section>
+
+      <section id="tui">
+        <h2>TUI Mode</h2>
+        <p>Launch the beautiful terminal interface:</p>
+        <div class="code-block inline">
+          <pre><code>perch</code></pre>
+          <button class="copy-btn small" data-copy="perch">Copy</button>
+        </div>
+
+        <div class="screenshot-gallery">
+          <figure>
+            <img src={`${baseUrl}screenshots/01-timeline.png`} alt="Timeline view" loading="lazy" />
+            <figcaption>Timeline — Browse posts from all your connected networks</figcaption>
+          </figure>
+          <figure>
+            <img src={`${baseUrl}screenshots/06-compose.png`} alt="Compose dialog" loading="lazy" />
+            <figcaption>Compose — Write once, post to multiple networks</figcaption>
+          </figure>
+          <figure>
+            <img src={`${baseUrl}screenshots/07-accounts.png`} alt="Accounts view" loading="lazy" />
+            <figcaption>Accounts — Manage your connected accounts</figcaption>
+          </figure>
+        </div>
+      </section>
+
+      <section id="cli">
+        <h2>CLI Commands</h2>
+
+        <h3>Posting</h3>
+        <div class="code-block">
+          <pre><code># Post to all configured networks
+perch post "Hello world!"
+
+# Post to specific networks
+perch post "Hello Fediverse!" --to mastodon
+perch post "Hello everyone!" --to mastodon,bluesky
+
+# Post with content warning
+perch post "Spoiler content" --cw "Movie spoilers"</code></pre>
+        </div>
+
+        <h3>Timeline</h3>
+        <div class="code-block">
+          <pre><code># View home timeline (all networks)
+perch timeline
+
+# View specific network
+perch timeline mastodon
+perch timeline bluesky
+
+# Limit posts
+perch timeline --limit 50</code></pre>
+        </div>
+
+        <h3>Account Management</h3>
+        <div class="code-block">
+          <pre><code># List all accounts
+perch accounts
+
+# Remove an account
+perch accounts remove &lt;account-id&gt;</code></pre>
+        </div>
+      </section>
+
+      <section id="posting">
+        <h2>Posting</h2>
+
+        <h3>From the TUI</h3>
+        <ol>
+          <li>Press <kbd>n</kbd> to open the compose dialog</li>
+          <li>Type your message</li>
+          <li>Toggle networks with <kbd>F1</kbd>/<kbd>F2</kbd></li>
+          <li>Press <kbd>Ctrl+S</kbd> to send</li>
+        </ol>
+
+        <h3>From the CLI</h3>
+        <div class="code-block">
+          <pre><code>perch post "Your message here"</code></pre>
+        </div>
+      </section>
+
+      <section id="navigation">
+        <h2>Navigation Keybindings</h2>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Key</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td><kbd>Tab</kbd></td><td>Switch between views</td></tr>
+              <tr><td><kbd>1</kbd> / <kbd>2</kbd></td><td>Jump to Timeline/Accounts</td></tr>
+              <tr><td><kbd>h</kbd> / <kbd>l</kbd> or <kbd>←</kbd> / <kbd>→</kbd></td><td>Switch panels</td></tr>
+              <tr><td><kbd>j</kbd> / <kbd>k</kbd> or <kbd>↑</kbd> / <kbd>↓</kbd></td><td>Navigate items</td></tr>
+              <tr><td><kbd>g</kbd> / <kbd>G</kbd></td><td>Go to first/last item</td></tr>
+              <tr><td><kbd>?</kbd></td><td>Show help</td></tr>
+              <tr><td><kbd>q</kbd></td><td>Quit</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="timeline">
+        <h2>Timeline Actions</h2>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Key</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td><kbd>n</kbd></td><td>Compose new post</td></tr>
+              <tr><td><kbd>R</kbd></td><td>Reply to post</td></tr>
+              <tr><td><kbd>r</kbd></td><td>Repost/unrepost (toggle)</td></tr>
+              <tr><td><kbd>L</kbd></td><td>Like/unlike post</td></tr>
+              <tr><td><kbd>b</kbd></td><td>Refresh timeline</td></tr>
+              <tr><td><kbd>o</kbd></td><td>Open in browser</td></tr>
+              <tr><td><kbd>f</kbd></td><td>Cycle filter (All/Mastodon/Bluesky)</td></tr>
+              <tr><td><kbd>/</kbd></td><td>Search posts</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="compose">
+        <h2>Compose Keybindings</h2>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Key</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td><kbd>F1</kbd> / <kbd>F2</kbd></td><td>Toggle Mastodon/Bluesky</td></tr>
+              <tr><td><kbd>Ctrl+S</kbd></td><td>Send post</td></tr>
+              <tr><td><kbd>Enter</kbd></td><td>New line</td></tr>
+              <tr><td><kbd>Esc</kbd></td><td>Cancel</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="config-file">
+        <h2>Configuration</h2>
+        <p>Perch uses TOML for configuration. The config file is located at:</p>
+        <div class="code-block inline">
+          <pre><code>~/.config/perch/config.toml</code></pre>
+        </div>
+
+        <h3>Example Configuration</h3>
+        <div class="code-block">
+          <pre><code># Theme (dracula, nord, catppuccin-mocha, etc.)
+theme = "dracula"
+
+# Default visibility for posts
+# Options: public, unlisted, private, direct
+default_visibility = "public"
+
+# Default networks to post to
+default_networks = ["mastodon", "bluesky"]
+
+# Number of posts to fetch
+post_limit = 50</code></pre>
+        </div>
+      </section>
+
+      <section id="themes">
+        <h2>Themes</h2>
+        <p>Perch includes 15 beautiful themes. Press <kbd>t</kbd> to open the theme picker, or set in config:</p>
+        <div class="code-block">
+          <pre><code>theme = "catppuccin-mocha"</code></pre>
+        </div>
+        <p>Available themes: dracula, one-dark-pro, nord, catppuccin-mocha, catppuccin-latte, gruvbox-dark, gruvbox-light, tokyo-night, solarized-dark, solarized-light, monokai-pro, rose-pine, kanagawa, everforest, cyberpunk</p>
+        <p><a href={`${baseUrl}themes`}>See all themes →</a></p>
+      </section>
+    </div>
+  </div>
+</Layout>
+
+<style>
+  .callout {
+    padding: 1rem 1.25rem;
+    border-radius: 8px;
+    margin: 1.5rem 0;
+  }
+
+  .callout.info {
+    background: rgba(137, 180, 250, 0.1);
+    border-left: 4px solid #89b4fa;
+  }
+
+  .docs-layout {
+    display: flex;
+    padding-top: var(--nav-height);
+    min-height: calc(100vh - var(--nav-height));
+  }
+
+  .docs-sidebar {
+    width: 260px;
+    flex-shrink: 0;
+    background: var(--bg-secondary);
+    border-right: 1px solid var(--bg-tertiary);
+    position: sticky;
+    top: var(--nav-height);
+    height: calc(100vh - var(--nav-height));
+    overflow-y: auto;
+    padding: 2rem 1.5rem;
+  }
+
+  .docs-nav h3 {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-secondary);
+    margin-top: 1.5rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .docs-nav h3:first-child {
+    margin-top: 0;
+  }
+
+  .docs-nav ul {
+    list-style: none;
+  }
+
+  .docs-nav li {
+    margin-bottom: 0.5rem;
+  }
+
+  .docs-nav a {
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    opacity: 0.8;
+    transition: opacity 0.2s, color 0.2s;
+  }
+
+  .docs-nav a:hover {
+    opacity: 1;
+    color: var(--accent-purple);
+  }
+
+  .docs-content {
+    flex: 1;
+    max-width: 900px;
+    padding: 3rem 4rem;
+  }
+
+  .docs-header {
+    margin-bottom: 3rem;
+    padding-bottom: 2rem;
+    border-bottom: 1px solid var(--bg-tertiary);
+  }
+
+  .docs-header h1 {
+    font-size: 2.5rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .docs-header p {
+    color: var(--text-secondary);
+    font-size: 1.125rem;
+  }
+
+  section {
+    margin-bottom: 4rem;
+    scroll-margin-top: calc(var(--nav-height) + 2rem);
+  }
+
+  section h2 {
+    font-size: 1.75rem;
+    margin-bottom: 1rem;
+    text-align: left;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--bg-tertiary);
+  }
+
+  section h3 {
+    font-size: 1.25rem;
+    margin-top: 2rem;
+    margin-bottom: 0.75rem;
+    color: var(--accent-cyan);
+  }
+
+  section p {
+    margin-bottom: 1rem;
+    color: var(--text-secondary);
+  }
+
+  section ul, section ol {
+    margin-bottom: 1rem;
+    padding-left: 1.5rem;
+    color: var(--text-secondary);
+  }
+
+  section li {
+    margin-bottom: 0.5rem;
+  }
+
+  .code-block {
+    background: var(--bg-secondary);
+    border: 1px solid var(--bg-tertiary);
+    border-radius: 8px;
+    margin-bottom: 1.5rem;
+    overflow: hidden;
+  }
+
+  .code-block.inline {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .code-block.inline pre {
+    padding: 0;
+    margin: 0;
+    background: none;
+    border: none;
+  }
+
+  .code-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 1rem;
+    background: var(--bg-tertiary);
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+  }
+
+  .code-block pre {
+    margin: 0;
+    padding: 1rem;
+    border: none;
+    border-radius: 0;
+  }
+
+  .copy-btn {
+    background: var(--bg-primary);
+    border: none;
+    color: var(--text-secondary);
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.75rem;
+    font-family: var(--font-sans);
+    transition: all 0.2s;
+  }
+
+  .copy-btn:hover {
+    background: var(--accent-purple);
+    color: var(--bg-primary);
+  }
+
+  .copy-btn.small {
+    padding: 0.2rem 0.4rem;
+    font-size: 0.7rem;
+  }
+
+  .table-wrapper {
+    overflow-x: auto;
+    margin-bottom: 1.5rem;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+  }
+
+  th, td {
+    text-align: left;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--bg-tertiary);
+  }
+
+  th {
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    letter-spacing: 0.05em;
+  }
+
+  td {
+    color: var(--text-primary);
+  }
+
+  kbd {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--text-secondary);
+    border-radius: 4px;
+    padding: 0.2em 0.5em;
+    font-family: var(--font-mono);
+    font-size: 0.85em;
+  }
+
+  .numbered-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    margin-top: 1.5rem;
+  }
+
+  .numbered-step {
+    display: flex;
+    gap: 1.5rem;
+    align-items: flex-start;
+  }
+
+  .numbered-step .number {
+    width: 32px;
+    height: 32px;
+    background: var(--accent-purple);
+    color: var(--bg-primary);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  .screenshot-gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.5rem;
+    margin-top: 1.5rem;
+  }
+
+  .screenshot-gallery figure {
+    margin: 0;
+  }
+
+  .screenshot-gallery img {
+    width: 100%;
+    border-radius: 8px;
+    border: 1px solid var(--bg-tertiary);
+  }
+
+  .screenshot-gallery figcaption {
+    margin-top: 0.75rem;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    text-align: center;
+  }
+
+  @media (max-width: 1024px) {
+    .docs-sidebar {
+      display: none;
+    }
+
+    .docs-content {
+      padding: 2rem 1.5rem;
+    }
+  }
+
+  @media (max-width: 768px) {
+    .docs-content {
+      padding: 1.5rem 1rem;
+    }
+
+    .numbered-step {
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .screenshot-gallery {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+
+<script>
+  document.querySelectorAll('.copy-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const text = btn.getAttribute('data-copy');
+      if (!text) return;
+
+      try {
+        await navigator.clipboard.writeText(text);
+        const originalText = btn.textContent;
+        btn.textContent = 'Copied!';
+        btn.style.background = 'var(--accent-green)';
+        btn.style.color = 'var(--bg-primary)';
+
+        setTimeout(() => {
+          btn.textContent = originalText;
+          btn.style.background = '';
+          btn.style.color = '';
+        }, 2000);
+      } catch (err) {
+        console.error('Failed to copy:', err);
+      }
+    });
+  });
+</script>

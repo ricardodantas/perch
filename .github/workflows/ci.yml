@@ -6,11 +6,15 @@ on:
     paths-ignore:
       - '*.md'
       - 'assets/**'
+      - 'website/**'
+      - 'screenshots/**'
   pull_request:
     branches: [main]
     paths-ignore:
       - '*.md'
       - 'assets/**'
+      - 'website/**'
+      - 'screenshots/**'
 
 env:
   CARGO_TERM_COLOR: always

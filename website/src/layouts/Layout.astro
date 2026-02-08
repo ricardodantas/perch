@@ -1,0 +1,421 @@
+---
+interface Props {
+  title: string;
+  description?: string;
+  canonical?: string;
+  keywords?: string[];
+  image?: string;
+  type?: 'website' | 'article';
+}
+
+const {
+  title,
+  description = 'Perch is a beautiful terminal social client for Mastodon and Bluesky. Read, post, and engage across social networks from your terminal.',
+  canonical,
+  keywords = ['mastodon client', 'bluesky client', 'terminal', 'tui', 'rust', 'cli', 'social media', 'fediverse', 'at protocol', 'cross-posting'],
+  image = '/og-image.png',
+  type = 'website'
+} = Astro.props;
+
+const baseUrl = import.meta.env.BASE_URL;
+const siteUrl = 'https://perch.ricardodantas.me';
+const canonicalUrl = canonical ? `${siteUrl}${canonical}` : `${siteUrl}${Astro.url.pathname}`;
+
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Perch",
+  "description": description,
+  "url": siteUrl,
+  "applicationCategory": "SocialNetworkingApplication",
+  "operatingSystem": "macOS, Linux, Windows",
+  "softwareVersion": "0.1.0",
+  "author": {
+    "@type": "Person",
+    "name": "Ricardo Dantas",
+    "url": "https://github.com/ricardodantas"
+  },
+  "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "USD"
+  },
+  "license": "https://opensource.org/licenses/MIT",
+  "downloadUrl": "https://github.com/ricardodantas/perch/releases",
+  "screenshot": `${siteUrl}/screenshots/01-timeline.png`,
+  "featureList": [
+    "Mastodon integration with OAuth",
+    "Bluesky AT Protocol support",
+    "Cross-posting to multiple networks",
+    "Beautiful TUI interface",
+    "15 color themes",
+    "Offline cache",
+    "Vim keybindings"
+  ],
+  "keywords": keywords.join(", "),
+  "programmingLanguage": "Rust",
+  "codeRepository": "https://github.com/ricardodantas/perch"
+};
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+
+    <title>{title}</title>
+    <meta name="title" content={title} />
+    <meta name="description" content={description} />
+    <meta name="keywords" content={keywords.join(', ')} />
+    <meta name="author" content="Ricardo Dantas" />
+    <meta name="robots" content="index, follow" />
+    <meta name="language" content="English" />
+    <meta name="generator" content={Astro.generator} />
+
+    <link rel="canonical" href={canonicalUrl} />
+
+    <link rel="icon" type="image/svg+xml" href={`${baseUrl}favicon.svg`} />
+    <link rel="apple-touch-icon" sizes="180x180" href={`${baseUrl}apple-touch-icon.png`} />
+
+    <meta property="og:type" content={type} />
+    <meta property="og:url" content={canonicalUrl} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:image" content={`${siteUrl}${image}`} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:site_name" content="Perch" />
+    <meta property="og:locale" content="en_US" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:url" content={canonicalUrl} />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={`${siteUrl}${image}`} />
+    <meta name="twitter:creator" content="@ricardodantas" />
+
+    <meta name="application-name" content="Perch" />
+    <meta name="apple-mobile-web-app-title" content="Perch" />
+    <meta name="theme-color" content="#282a36" />
+    <meta name="msapplication-TileColor" content="#282a36" />
+
+    <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  </head>
+  <body>
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+
+    <nav class="navbar" role="navigation" aria-label="Main navigation">
+      <div class="nav-container">
+        <a href={baseUrl} class="nav-logo" aria-label="Perch home">
+          <span class="logo-icon" aria-hidden="true">🐦</span>
+          <span class="logo-text">Perch</span>
+        </a>
+        <div class="nav-links" id="nav-links">
+          <a href={baseUrl}>Home</a>
+          <a href={`${baseUrl}docs`}>Documentation</a>
+          <a href={`${baseUrl}themes`}>Themes</a>
+          <a href="https://github.com/ricardodantas/perch" target="_blank" rel="noopener noreferrer" class="github-link">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">
+              <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+            </svg>
+            <span>GitHub</span>
+          </a>
+        </div>
+        <button class="nav-toggle" aria-label="Toggle navigation menu" aria-expanded="false" aria-controls="nav-links">
+          <span></span>
+          <span></span>
+          <span></span>
+        </button>
+      </div>
+    </nav>
+
+    <main id="main-content" role="main">
+      <slot />
+    </main>
+
+    <footer role="contentinfo">
+      <div class="footer-container">
+        <p>Made with ❤️ and 🦀 for social media enthusiasts</p>
+        <p class="footer-links">
+          <a href="https://github.com/ricardodantas/perch" target="_blank" rel="noopener noreferrer">GitHub</a>
+          <span aria-hidden="true">•</span>
+          <a href="https://github.com/ricardodantas/perch/issues" target="_blank" rel="noopener noreferrer">Issues</a>
+          <span aria-hidden="true">•</span>
+          <a href="https://github.com/ricardodantas/perch/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">MIT License</a>
+        </p>
+        <p class="footer-copyright">© 2024-2026 Ricardo Dantas. Open source under MIT License.</p>
+      </div>
+    </footer>
+  </body>
+</html>
+
+<style is:global>
+  :root {
+    --bg-primary: #282a36;
+    --bg-secondary: #1e1f29;
+    --bg-tertiary: #44475a;
+    --text-primary: #f8f8f2;
+    --text-secondary: #6272a4;
+    --accent-cyan: #8be9fd;
+    --accent-green: #50fa7b;
+    --accent-orange: #ffb86c;
+    --accent-pink: #ff79c6;
+    --accent-purple: #bd93f9;
+    --accent-red: #ff5555;
+    --accent-yellow: #f1fa8c;
+
+    --font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+    --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+
+    --max-width: 1200px;
+    --nav-height: 64px;
+  }
+
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    font-size: 16px;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    line-height: 1.6;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  main {
+    flex: 1;
+  }
+
+  a {
+    color: var(--accent-purple);
+    text-decoration: none;
+    transition: color 0.2s;
+  }
+
+  a:hover {
+    color: var(--accent-pink);
+  }
+
+  a:focus-visible {
+    outline: 2px solid var(--accent-purple);
+    outline-offset: 2px;
+  }
+
+  .skip-link {
+    position: absolute;
+    top: -100%;
+    left: 0;
+    background: var(--accent-purple);
+    color: var(--bg-primary);
+    padding: 8px 16px;
+    z-index: 9999;
+    font-weight: 600;
+  }
+
+  .skip-link:focus {
+    top: 0;
+  }
+
+  code {
+    font-family: var(--font-mono);
+    background: var(--bg-tertiary);
+    padding: 0.2em 0.4em;
+    border-radius: 4px;
+    font-size: 0.9em;
+  }
+
+  pre {
+    font-family: var(--font-mono);
+    background: var(--bg-secondary);
+    padding: 1rem 1.5rem;
+    border-radius: 8px;
+    overflow-x: auto;
+    border: 1px solid var(--bg-tertiary);
+  }
+
+  pre code {
+    background: none;
+    padding: 0;
+    font-size: 0.875rem;
+  }
+
+  .navbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: var(--nav-height);
+    background: rgba(30, 31, 41, 0.95);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--bg-tertiary);
+    z-index: 1000;
+  }
+
+  .nav-container {
+    max-width: var(--max-width);
+    margin: 0 auto;
+    padding: 0 1.5rem;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .nav-logo {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+
+  .nav-logo:hover {
+    color: var(--text-primary);
+  }
+
+  .logo-icon {
+    font-size: 1.5rem;
+  }
+
+  .nav-links {
+    display: flex;
+    align-items: center;
+    gap: 2rem;
+  }
+
+  .nav-links a {
+    color: var(--text-secondary);
+    font-weight: 500;
+    transition: color 0.2s;
+  }
+
+  .nav-links a:hover {
+    color: var(--text-primary);
+  }
+
+  .github-link {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .nav-toggle {
+    display: none;
+    flex-direction: column;
+    gap: 4px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px;
+  }
+
+  .nav-toggle span {
+    display: block;
+    width: 24px;
+    height: 2px;
+    background: var(--text-primary);
+    transition: transform 0.2s;
+  }
+
+  footer {
+    background: var(--bg-secondary);
+    border-top: 1px solid var(--bg-tertiary);
+    padding: 2rem 1.5rem;
+    text-align: center;
+    width: 100%;
+    flex-shrink: 0;
+  }
+
+  .footer-container {
+    max-width: var(--max-width);
+    margin: 0 auto;
+  }
+
+  .footer-links {
+    margin-top: 0.5rem;
+    color: var(--text-secondary);
+  }
+
+  .footer-links a {
+    color: var(--text-secondary);
+  }
+
+  .footer-links a:hover {
+    color: var(--accent-purple);
+  }
+
+  .footer-links span {
+    margin: 0 0.5rem;
+  }
+
+  .footer-copyright {
+    margin-top: 1rem;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+  }
+
+  @media (max-width: 768px) {
+    .nav-links {
+      display: none;
+      position: absolute;
+      top: var(--nav-height);
+      left: 0;
+      right: 0;
+      background: var(--bg-secondary);
+      flex-direction: column;
+      padding: 1rem;
+      gap: 1rem;
+      border-bottom: 1px solid var(--bg-tertiary);
+    }
+
+    .nav-links.active {
+      display: flex;
+    }
+
+    .nav-toggle {
+      display: flex;
+    }
+
+    footer {
+      padding: 1.5rem 1rem;
+    }
+
+    .footer-links {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      align-items: center;
+    }
+
+    .footer-links span {
+      display: none;
+    }
+  }
+</style>
+
+<script>
+  const navToggle = document.querySelector('.nav-toggle');
+  const navLinks = document.querySelector('.nav-links');
+
+  navToggle?.addEventListener('click', () => {
+    const isExpanded = navToggle.getAttribute('aria-expanded') === 'true';
+    navToggle.setAttribute('aria-expanded', (!isExpanded).toString());
+    navLinks?.classList.toggle('active');
+  });
+</script>

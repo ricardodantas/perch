@@ -1,0 +1,209 @@
+---
+import Layout from '../layouts/Layout.astro';
+
+const baseUrl = import.meta.env.BASE_URL;
+
+const themes = [
+  { name: 'Dracula', emoji: '🦇', description: 'Dark purple aesthetic' },
+  { name: 'One Dark Pro', emoji: '🌙', description: "Atom's iconic dark theme" },
+  { name: 'Nord', emoji: '❄️', description: 'Arctic, bluish color palette' },
+  { name: 'Catppuccin Mocha', emoji: '🐱', description: 'Warm pastel dark theme' },
+  { name: 'Catppuccin Latte', emoji: '☕', description: 'Warm pastel light theme' },
+  { name: 'Gruvbox Dark', emoji: '🎸', description: 'Retro groove colors' },
+  { name: 'Gruvbox Light', emoji: '📜', description: 'Retro groove, light variant' },
+  { name: 'Tokyo Night', emoji: '🌃', description: 'Futuristic dark blue' },
+  { name: 'Solarized Dark', emoji: '🌅', description: 'Precision colors, dark' },
+  { name: 'Solarized Light', emoji: '🌞', description: 'Precision colors, light' },
+  { name: 'Monokai Pro', emoji: '🎨', description: 'Classic syntax highlighting' },
+  { name: 'Rosé Pine', emoji: '🌹', description: 'All natural pine with soho vibes' },
+  { name: 'Kanagawa', emoji: '🌊', description: 'Inspired by Katsushika Hokusai' },
+  { name: 'Everforest', emoji: '🌲', description: 'Comfortable green forest theme' },
+  { name: 'Cyberpunk', emoji: '🌆', description: 'Neon-soaked futuristic theme' },
+];
+---
+
+<Layout title="Themes - Perch">
+  <div class="themes-page">
+    <div class="container">
+      <div class="page-header">
+        <h1>🎨 Themes</h1>
+        <p>Perch includes 15 beautiful color themes. Press <kbd>t</kbd> in the TUI to open the theme picker.</p>
+      </div>
+
+      <div class="theme-preview">
+        <img src={`${baseUrl}screenshots/03-theme-picker.png`} alt="Theme picker in Perch" loading="lazy" />
+      </div>
+
+      <div class="themes-grid">
+        {themes.map(theme => (
+          <div class="theme-card">
+            <div class="theme-emoji">{theme.emoji}</div>
+            <h3>{theme.name}</h3>
+            <p>{theme.description}</p>
+          </div>
+        ))}
+      </div>
+
+      <div class="usage-section">
+        <h2>Setting a Theme</h2>
+        <p>There are two ways to set your theme:</p>
+
+        <h3>1. Interactive Theme Picker</h3>
+        <p>Press <kbd>t</kbd> while in the TUI to open the theme picker. Use <kbd>↑</kbd>/<kbd>↓</kbd> to navigate and <kbd>Enter</kbd> to apply.</p>
+
+        <h3>2. Configuration File</h3>
+        <p>Set your preferred theme in <code>~/.config/perch/config.toml</code>:</p>
+        <pre><code>theme = "dracula"</code></pre>
+
+        <h3>Available Theme Names</h3>
+        <pre><code>{`dracula
+one-dark-pro
+nord
+catppuccin-mocha
+catppuccin-latte
+gruvbox-dark
+gruvbox-light
+tokyo-night
+solarized-dark
+solarized-light
+monokai-pro
+rose-pine
+kanagawa
+everforest
+cyberpunk`}</code></pre>
+      </div>
+    </div>
+  </div>
+</Layout>
+
+<style>
+  .themes-page {
+    padding: calc(var(--nav-height) + 3rem) 1.5rem 4rem;
+  }
+
+  .container {
+    max-width: var(--max-width);
+    margin: 0 auto;
+  }
+
+  .page-header {
+    text-align: center;
+    margin-bottom: 3rem;
+  }
+
+  .page-header h1 {
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+  }
+
+  .page-header p {
+    color: var(--text-secondary);
+    font-size: 1.125rem;
+  }
+
+  kbd {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--text-secondary);
+    border-radius: 4px;
+    padding: 0.2em 0.5em;
+    font-family: var(--font-mono);
+    font-size: 0.85em;
+  }
+
+  .theme-preview {
+    text-align: center;
+    margin-bottom: 4rem;
+  }
+
+  .theme-preview img {
+    max-width: 100%;
+    border-radius: 12px;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    border: 1px solid var(--bg-tertiary);
+  }
+
+  .themes-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 4rem;
+  }
+
+  .theme-card {
+    background: var(--bg-secondary);
+    padding: 1.5rem;
+    border-radius: 12px;
+    border: 1px solid var(--bg-tertiary);
+    text-align: center;
+    transition: transform 0.2s, border-color 0.2s;
+  }
+
+  .theme-card:hover {
+    transform: translateY(-4px);
+    border-color: var(--accent-purple);
+  }
+
+  .theme-emoji {
+    font-size: 2rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .theme-card h3 {
+    font-size: 1rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .theme-card p {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    margin: 0;
+  }
+
+  .usage-section {
+    background: var(--bg-secondary);
+    padding: 2rem;
+    border-radius: 12px;
+    border: 1px solid var(--bg-tertiary);
+  }
+
+  .usage-section h2 {
+    font-size: 1.5rem;
+    margin-bottom: 1rem;
+    text-align: left;
+  }
+
+  .usage-section h3 {
+    font-size: 1.125rem;
+    margin-top: 1.5rem;
+    margin-bottom: 0.75rem;
+    color: var(--accent-cyan);
+  }
+
+  .usage-section p {
+    color: var(--text-secondary);
+    margin-bottom: 1rem;
+  }
+
+  .usage-section pre {
+    margin-top: 0.5rem;
+  }
+
+  @media (max-width: 768px) {
+    .themes-page {
+      padding: calc(var(--nav-height) + 2rem) 1rem 3rem;
+    }
+
+    .themes-grid {
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1rem;
+    }
+
+    .theme-card {
+      padding: 1rem;
+    }
+
+    .usage-section {
+      padding: 1.5rem;
+    }
+  }
+</style>
