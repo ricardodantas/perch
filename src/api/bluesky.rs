@@ -469,11 +469,93 @@ impl SocialApi for BlueskyClient {
         Ok(())
     }
 
-    async fn unrepost(&self, _post: &Post) -> Result<()> {
-        // For Bluesky, we need to find and delete the repost record
-        // This requires knowing the rkey of our repost, which we don't track
-        // For now, return an error - full implementation would need to search for the repost
-        bail!("Unrepost not yet implemented for Bluesky - refresh to update status")
+    async fn unrepost(&self, post: &Post) -> Result<()> {
+        let uri = post.uri.as_ref().context("Post missing URI for unrepost")?;
+        
+        // Find the repost record in the actor's repo
+        let records_url = format!(
+            "{}/xrpc/com.atproto.repo.listRecords?repo={}&collection=app.bsky.feed.repost&limit=100",
+            self.pds_url, self.did
+        );
+        
+        let response = self
+            .client
+            .get(&records_url)
+            .header("Authorization", format!("Bearer {}", self.access_jwt))
+            .send()
+            .await
+            .context("Failed to list repost records")?;
+        
+        if !response.status().is_success() {
+            let error_text = response.text().await.unwrap_or_default();
+            bail!("Failed to list repost records: {}", error_text);
+        }
+        
+        #[derive(Debug, Deserialize)]
+        struct ListRecordsResponse {
+            records: Vec<RecordItem>,
+        }
+        
+        #[derive(Debug, Deserialize)]
+        struct RecordItem {
+            uri: String,
+            value: RepostRecordValue,
+        }
+        
+        #[derive(Debug, Deserialize)]
+        struct RepostRecordValue {
+            subject: RecordRef,
+        }
+        
+        #[derive(Debug, Deserialize)]
+        struct RecordRef {
+            uri: String,
+        }
+        
+        let records: ListRecordsResponse = response.json().await.context("Failed to parse records")?;
+        
+        // Find the repost record for this post
+        let repost_record = records.records.iter().find(|r| r.value.subject.uri == *uri);
+        
+        let Some(record) = repost_record else {
+            // Already unreposted or not found
+            return Ok(());
+        };
+        
+        // Extract rkey from the record URI
+        let rkey = record.uri.split('/').last().context("Invalid record URI")?;
+        
+        // Delete the repost record
+        let delete_url = format!("{}/xrpc/com.atproto.repo.deleteRecord", self.pds_url);
+        
+        #[derive(Debug, Serialize)]
+        struct DeleteRequest {
+            repo: String,
+            collection: String,
+            rkey: String,
+        }
+        
+        let delete_request = DeleteRequest {
+            repo: self.did.clone(),
+            collection: "app.bsky.feed.repost".to_string(),
+            rkey: rkey.to_string(),
+        };
+        
+        let response = self
+            .client
+            .post(&delete_url)
+            .header("Authorization", format!("Bearer {}", self.access_jwt))
+            .json(&delete_request)
+            .send()
+            .await
+            .context("Failed to delete repost")?;
+        
+        if !response.status().is_success() {
+            let error_text = response.text().await.unwrap_or_default();
+            bail!("Failed to unrepost: {}", error_text);
+        }
+        
+        Ok(())
     }
 
     async fn verify_credentials(&self) -> Result<Account> {
