@@ -120,7 +120,9 @@ fn run_app(
 
         // Process any async results
         while let Ok(result) = async_handle.result_rx.try_recv() {
-            handle_async_result(state, result);
+            if let Some(cmd) = handle_async_result(state, result) {
+                let _ = async_handle.cmd_tx.blocking_send(cmd);
+            }
         }
 
         // Draw UI
@@ -157,7 +159,7 @@ fn run_app(
     Ok(())
 }
 
-fn handle_async_result(state: &mut AppState, result: AsyncResult) {
+fn handle_async_result(state: &mut AppState, result: AsyncResult) -> Option<AsyncCommand> {
     match result {
         AsyncResult::TimelineRefreshed { posts } => {
             // Cache posts to database
@@ -168,6 +170,17 @@ fn handle_async_result(state: &mut AppState, result: AsyncResult) {
             state.selected_post = 0;
             state.loading = false;
             state.set_status(format!("Loaded {} posts", state.posts.len()));
+
+            // Fetch replies for the first post
+            if let Some(post) = state.selected_post().cloned() {
+                if let Some(account) = state.accounts.iter().find(|a| a.network == post.network) {
+                    return Some(AsyncCommand::FetchContext {
+                        post,
+                        account: account.clone(),
+                    });
+                }
+            }
+            None
         }
         AsyncResult::ContextFetched {
             post_id: _,
@@ -175,6 +188,7 @@ fn handle_async_result(state: &mut AppState, result: AsyncResult) {
         } => {
             state.current_replies = replies;
             state.loading_replies = false;
+            None
         }
         AsyncResult::Liked { post_id } => {
             // Update the post in our local state
@@ -183,6 +197,7 @@ fn handle_async_result(state: &mut AppState, result: AsyncResult) {
                 post.like_count += 1;
             }
             state.set_status("❤️ Liked!");
+            None
         }
         AsyncResult::Unliked { post_id } => {
             if let Some(post) = state.posts.iter_mut().find(|p| p.network_id == post_id) {
@@ -190,6 +205,7 @@ fn handle_async_result(state: &mut AppState, result: AsyncResult) {
                 post.like_count = post.like_count.saturating_sub(1);
             }
             state.set_status("💔 Unliked");
+            None
         }
         AsyncResult::Reposted { post_id } => {
             if let Some(post) = state.posts.iter_mut().find(|p| p.network_id == post_id) {
@@ -197,6 +213,7 @@ fn handle_async_result(state: &mut AppState, result: AsyncResult) {
                 post.repost_count += 1;
             }
             state.set_status("🔁 Reposted!");
+            None
         }
         AsyncResult::Unreposted { post_id } => {
             if let Some(post) = state.posts.iter_mut().find(|p| p.network_id == post_id) {
@@ -204,22 +221,27 @@ fn handle_async_result(state: &mut AppState, result: AsyncResult) {
                 post.repost_count = post.repost_count.saturating_sub(1);
             }
             state.set_status("↩️ Unreposted");
+            None
         }
         AsyncResult::Posted { posts } => {
             let networks: Vec<_> = posts.iter().map(|p| p.network.emoji()).collect();
             state.set_status(format!("✅ Posted to {}", networks.join(" ")));
             state.loading = false;
+            None
         }
         AsyncResult::Scheduled { id, scheduled_for } => {
             state.set_status(format!("📅 Scheduled [{}] for {}", id, scheduled_for));
             state.loading = false;
+            None
         }
         AsyncResult::Error { message } => {
             state.set_status(format!("❌ {message}"));
             state.loading = false;
+            None
         }
         AsyncResult::Status { message } => {
             state.set_status(message);
+            None
         }
     }
 }

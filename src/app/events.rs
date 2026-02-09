@@ -330,6 +330,12 @@ fn handle_timeline_key(state: &mut AppState, key: KeyEvent) -> Option<AsyncComma
         // Enter detail view
         (_, KeyCode::Enter) if state.focused_panel == FocusedPanel::Timeline => {
             state.focused_panel = FocusedPanel::Detail;
+            // Fetch replies for the selected post
+            if let Some(post) = state.selected_post().cloned()
+                && let Some(account) = find_account_for_post(state, &post)
+            {
+                return Some(AsyncCommand::FetchContext { post, account });
+            }
             None
         }
 
