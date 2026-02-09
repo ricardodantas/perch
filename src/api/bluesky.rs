@@ -128,9 +128,16 @@ impl SocialApi for BlueskyClient {
             bail!("Failed to fetch thread: {error_text}");
         }
 
-        // Thread response is complex - for now return empty
-        // Full implementation would parse the nested thread structure
-        Ok(Vec::new())
+        let thread_response: GetThreadResponse = response
+            .json()
+            .await
+            .context("Failed to parse thread response")?;
+
+        // Collect all replies recursively
+        let mut replies = Vec::new();
+        thread_response.thread.collect_replies(&mut replies);
+
+        Ok(replies)
     }
 
     async fn post(&self, content: &str) -> Result<Post> {
@@ -660,7 +667,7 @@ struct ActorRef {
     display_name: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 struct PostView {
     uri: String,
     cid: String,
@@ -681,7 +688,7 @@ struct PostView {
     viewer: Option<ViewerState>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 struct Author {
     #[allow(dead_code)]
     did: String,
@@ -691,7 +698,7 @@ struct Author {
     avatar: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 struct PostRecord {
     text: String,
     #[serde(rename = "createdAt")]
@@ -700,7 +707,7 @@ struct PostRecord {
     r#type: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 struct Embed {
     #[allow(dead_code)]
     #[serde(rename = "$type")]
@@ -708,7 +715,7 @@ struct Embed {
     images: Option<Vec<EmbedImage>>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 struct EmbedImage {
     #[allow(dead_code)]
     thumb: String,
@@ -762,12 +769,114 @@ struct ProfileResponse {
 }
 
 /// Viewer state for a post (whether current user liked/reposted)
-#[derive(Debug, Deserialize, Default)]
+#[derive(Debug, Deserialize, Default, Clone)]
 struct ViewerState {
     /// URI of the like record if liked by viewer
     like: Option<String>,
     /// URI of the repost record if reposted by viewer
     repost: Option<String>,
+}
+
+/// Thread view response from getPostThread
+#[derive(Debug, Deserialize)]
+struct GetThreadResponse {
+    thread: ThreadViewPost,
+}
+
+/// A post in a thread with optional replies
+#[derive(Debug, Deserialize)]
+struct ThreadViewPost {
+    post: PostView,
+    #[serde(default)]
+    replies: Vec<ThreadReply>,
+}
+
+/// A reply in a thread (can be nested)
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+enum ThreadReply {
+    Post(Box<ThreadViewPost>),
+    #[allow(dead_code)]
+    Other(serde_json::Value), // Handle blocked/notFound replies
+}
+
+impl ThreadViewPost {
+    /// Recursively collect all replies as flat list
+    fn collect_replies(&self, result: &mut Vec<Post>) {
+        for reply in &self.replies {
+            if let ThreadReply::Post(thread_post) = reply {
+                let post = post_view_to_post(thread_post.post.clone());
+                result.push(post);
+                // Recursively get nested replies
+                thread_post.collect_replies(result);
+            }
+        }
+    }
+}
+
+/// Convert a PostView to a Post
+fn post_view_to_post(post_view: PostView) -> Post {
+    let created_at = DateTime::parse_from_rfc3339(&post_view.record.created_at)
+        .or_else(|_| DateTime::parse_from_rfc3339(&post_view.indexed_at))
+        .map_or_else(|_| Utc::now(), |dt| dt.with_timezone(&Utc));
+
+    let media = post_view
+        .embed
+        .and_then(|e| e.images)
+        .map(|images| {
+            images
+                .into_iter()
+                .map(|img| MediaAttachment {
+                    url: img.fullsize,
+                    preview_url: None,
+                    media_type: MediaType::Image,
+                    alt_text: img.alt,
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+
+    // Build URL from URI
+    let url = format!(
+        "https://bsky.app/profile/{}/post/{}",
+        post_view.author.handle,
+        post_view.uri.split('/').next_back().unwrap_or("")
+    );
+
+    // Check viewer state for liked/reposted
+    let (liked, reposted) = post_view
+        .viewer
+        .as_ref()
+        .map_or((false, false), |v| (v.like.is_some(), v.repost.is_some()));
+
+    Post {
+        id: uuid::Uuid::new_v4(),
+        network_id: post_view
+            .uri
+            .split('/')
+            .next_back()
+            .unwrap_or(&post_view.uri)
+            .to_string(),
+        network: Network::Bluesky,
+        author_handle: post_view.author.handle,
+        author_name: post_view.author.display_name.unwrap_or_default(),
+        author_avatar: post_view.author.avatar,
+        content: post_view.record.text,
+        content_raw: None,
+        created_at,
+        url: Some(url),
+        is_repost: false,
+        repost_author: None,
+        like_count: post_view.like_count,
+        repost_count: post_view.repost_count,
+        reply_count: post_view.reply_count,
+        liked,
+        reposted,
+        reply_to_id: None,
+        media,
+        cid: Some(post_view.cid),
+        uri: Some(post_view.uri),
+    }
 }
 
 impl FeedViewPost {
