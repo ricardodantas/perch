@@ -213,18 +213,22 @@ async fn handle_fetch_context(result_tx: &mpsc::Sender<AsyncResult>, post: Post,
         Err(_) => return,
     };
 
-    if let Ok(flat_replies) = client.get_context(&post).await {
-        // Build threaded reply list with depth
-        let reply_items = build_reply_tree(&post.network_id, &flat_replies);
+    match client.get_context(&post).await {
+        Ok(flat_replies) => {
+            // Build threaded reply list with depth
+            let reply_items = build_reply_tree(&post.network_id, &flat_replies);
 
-        let _ = result_tx
-            .send(AsyncResult::ContextFetched {
-                post_id: post.network_id,
-                replies: reply_items,
-            })
-            .await;
-    } else {
-        // Silently fail - replies are optional
+            let _ = result_tx
+                .send(AsyncResult::ContextFetched {
+                    post_id: post.network_id,
+                    replies: reply_items,
+                })
+                .await;
+        }
+        Err(e) => {
+            // Log the error for debugging
+            eprintln!("Failed to fetch context: {}", e);
+        }
     }
 }
 

@@ -786,6 +786,9 @@ struct GetThreadResponse {
 /// A post in a thread with optional replies
 #[derive(Debug, Deserialize)]
 struct ThreadViewPost {
+    #[serde(rename = "$type")]
+    #[allow(dead_code)]
+    thread_type: Option<String>,
     post: PostView,
     #[serde(default)]
     replies: Vec<ThreadReply>,
