@@ -1,11 +1,15 @@
 # VHS tape for Perch screenshots
 Output screenshots/01-timeline.gif
 
-Set FontFamily "JetBrains Mono"
+Set Shell bash
+Set FontFamily "monospace"
 Set FontSize 14
 Set Width 1400
 Set Height 800
-Set Theme "Catppuccin Mocha"
+Set Padding 0
+Set Framerate 30
+Set LetterSpacing 0
+Set LineHeight 1.0
 
 Type "./target/release/perch --demo"
 Enter
