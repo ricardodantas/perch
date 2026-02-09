@@ -128,10 +128,10 @@ impl SocialApi for BlueskyClient {
             bail!("Failed to fetch thread: {error_text}");
         }
 
-        let thread_response: GetThreadResponse = response
-            .json()
-            .await
-            .context("Failed to parse thread response")?;
+        let text = response.text().await.context("Failed to read response")?;
+        
+        let thread_response: GetThreadResponse = serde_json::from_str(&text)
+            .with_context(|| format!("Failed to parse thread response: {}", &text[..text.len().min(500)]))?;
 
         // Collect all replies recursively
         let mut replies = Vec::new();
