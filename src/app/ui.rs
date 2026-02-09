@@ -297,37 +297,41 @@ fn render_timeline_view(frame: &mut Frame, state: &AppState, area: Rect) {
                 colors.text_muted(),
             )]),
             Line::from(""),
-            // Content lines
-            Line::from(vec![
-                Span::styled("  ", Style::default()),
-                Span::styled(&post.content, colors.text()),
-            ]),
-            Line::from(""),
-            Line::from("  ─────────────────────────────────"),
-            Line::from(""),
-            Line::from(vec![
-                Span::styled("  ", Style::default()),
-                Span::styled(
-                    format!("{} {}", like_icon, post.like_count),
-                    if post.liked {
-                        colors.text_error()
-                    } else {
-                        colors.text_muted()
-                    },
-                ),
-                Span::styled("   ", Style::default()),
-                Span::styled(
-                    format!("{} {}", repost_icon, post.repost_count),
-                    if post.reposted {
-                        colors.text_success()
-                    } else {
-                        colors.text_muted()
-                    },
-                ),
-                Span::styled("   ", Style::default()),
-                Span::styled(format!("💬 {}", post.reply_count), colors.text_muted()),
-            ]),
         ];
+
+        // Add content lines, preserving line breaks
+        for line in post.content.lines() {
+            detail_content.push(Line::from(vec![
+                Span::styled("  ", Style::default()),
+                Span::styled(line, colors.text()),
+            ]));
+        }
+
+        detail_content.push(Line::from(""));
+        detail_content.push(Line::from("  ─────────────────────────────────"));
+        detail_content.push(Line::from(""));
+        detail_content.push(Line::from(vec![
+            Span::styled("  ", Style::default()),
+            Span::styled(
+                format!("{} {}", like_icon, post.like_count),
+                if post.liked {
+                    colors.text_error()
+                } else {
+                    colors.text_muted()
+                },
+            ),
+            Span::styled("   ", Style::default()),
+            Span::styled(
+                format!("{} {}", repost_icon, post.repost_count),
+                if post.reposted {
+                    colors.text_success()
+                } else {
+                    colors.text_muted()
+                },
+            ),
+            Span::styled("   ", Style::default()),
+            Span::styled(format!("💬 {}", post.reply_count), colors.text_muted()),
+        ]));
 
         // Add replies section
         if !state.current_replies.is_empty() {
