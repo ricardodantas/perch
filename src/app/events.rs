@@ -146,9 +146,15 @@ fn handle_timeline_key(state: &mut AppState, key: KeyEvent) -> Option<AsyncComma
                         state.detail_scroll = state.detail_scroll.saturating_add(1);
                     } else {
                         match state.selected_reply {
-                            None => state.selected_reply = Some(0),
+                            None => {
+                                state.selected_reply = Some(0);
+                                // Scroll to show first reply (roughly after main post)
+                                state.detail_scroll = state.detail_scroll.max(10);
+                            }
                             Some(i) if i < state.current_replies.len().saturating_sub(1) => {
                                 state.selected_reply = Some(i + 1);
+                                // Auto-scroll down to keep reply visible (~5 lines per reply)
+                                state.detail_scroll = state.detail_scroll.saturating_add(5);
                             }
                             _ => {} // Already at last reply
                         }
@@ -180,8 +186,16 @@ fn handle_timeline_key(state: &mut AppState, key: KeyEvent) -> Option<AsyncComma
                         state.detail_scroll = state.detail_scroll.saturating_sub(1);
                     } else {
                         match state.selected_reply {
-                            Some(0) => state.selected_reply = None,
-                            Some(i) => state.selected_reply = Some(i - 1),
+                            Some(0) => {
+                                state.selected_reply = None;
+                                // Scroll back to top to show main post
+                                state.detail_scroll = 0;
+                            }
+                            Some(i) => {
+                                state.selected_reply = Some(i - 1);
+                                // Auto-scroll up to keep reply visible
+                                state.detail_scroll = state.detail_scroll.saturating_sub(5);
+                            }
                             None => {} // Already at main post
                         }
                     }

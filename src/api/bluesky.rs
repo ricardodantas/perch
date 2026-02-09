@@ -129,9 +129,14 @@ impl SocialApi for BlueskyClient {
         }
 
         let text = response.text().await.context("Failed to read response")?;
-        
-        let thread_response: GetThreadResponse = serde_json::from_str(&text)
-            .with_context(|| format!("Failed to parse thread response: {}", &text[..text.len().min(500)]))?;
+
+        let thread_response: GetThreadResponse =
+            serde_json::from_str(&text).with_context(|| {
+                format!(
+                    "Failed to parse thread response: {}",
+                    &text[..text.len().min(500)]
+                )
+            })?;
 
         // Collect all replies recursively
         let mut replies = Vec::new();
@@ -149,6 +154,7 @@ impl SocialApi for BlueskyClient {
             text: content.to_string(),
             created_at: now.clone(),
             r#type: "app.bsky.feed.post".to_string(),
+            reply: None,
         };
 
         let request = CreateRecordRequest {
@@ -224,6 +230,7 @@ impl SocialApi for BlueskyClient {
             text: content.to_string(),
             created_at: now.clone(),
             r#type: "app.bsky.feed.post".to_string(),
+            reply: None, // TODO: Add reply refs when implementing proper threading
         };
 
         let request = CreateRecordRequest {
@@ -705,6 +712,22 @@ struct PostRecord {
     created_at: String,
     #[serde(rename = "$type")]
     r#type: String,
+    /// Reply reference (parent and root)
+    reply: Option<ReplyRef>,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+struct ReplyRef {
+    parent: StrongRef,
+    #[allow(dead_code)]
+    root: StrongRef,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+struct StrongRef {
+    uri: String,
+    #[allow(dead_code)]
+    cid: String,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -817,7 +840,7 @@ impl ThreadViewPost {
     }
 }
 
-/// Convert a PostView to a Post
+/// Convert a `PostView` to a `Post`
 fn post_view_to_post(post_view: PostView) -> Post {
     let created_at = DateTime::parse_from_rfc3339(&post_view.record.created_at)
         .or_else(|_| DateTime::parse_from_rfc3339(&post_view.indexed_at))
@@ -875,7 +898,7 @@ fn post_view_to_post(post_view: PostView) -> Post {
         reply_count: post_view.reply_count,
         liked,
         reposted,
-        reply_to_id: None,
+        reply_to_id: post_view.record.reply.map(|r| r.parent.uri),
         media,
         cid: Some(post_view.cid),
         uri: Some(post_view.uri),

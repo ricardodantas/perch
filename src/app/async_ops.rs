@@ -3,12 +3,24 @@
 //! Uses channels to communicate between the sync TUI loop and async tasks.
 
 use anyhow::Result;
+use std::io::Write;
 use tokio::sync::mpsc;
 
 use super::state::ReplyItem;
 use crate::api::get_client;
 use crate::auth;
 use crate::models::{Account, Network, Post};
+
+/// Log debug messages to `/tmp/perch_debug.log`
+fn log_debug(msg: &str) {
+    if let Ok(mut f) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open("/tmp/perch_debug.log")
+    {
+        let _ = writeln!(f, "[{}] {}", chrono::Local::now().format("%H:%M:%S"), msg);
+    }
+}
 
 /// Commands sent from the TUI to the async worker
 #[derive(Debug, Clone)]
@@ -205,18 +217,37 @@ async fn fetch_timeline(account: &Account, token: &str) -> Result<Vec<Post>> {
 async fn handle_fetch_context(result_tx: &mpsc::Sender<AsyncResult>, post: Post, account: Account) {
     let token = match auth::get_credentials(&account) {
         Ok(Some(t)) => t,
-        _ => return,
+        _ => {
+            log_debug("No token for account");
+            return;
+        }
     };
 
     let client = match get_client(&account, &token).await {
         Ok(c) => c,
-        Err(_) => return,
+        Err(e) => {
+            log_debug(&format!("Failed to get client: {}", e));
+            return;
+        }
     };
 
     match client.get_context(&post).await {
         Ok(flat_replies) => {
+            log_debug(&format!(
+                "Got {} flat replies for {}",
+                flat_replies.len(),
+                post.network_id
+            ));
+            if !flat_replies.is_empty() {
+                log_debug(&format!(
+                    "  First reply reply_to_id: {:?}",
+                    flat_replies[0].reply_to_id
+                ));
+                log_debug(&format!("  Post uri: {:?}", post.uri));
+            }
             // Build threaded reply list with depth
-            let reply_items = build_reply_tree(&post.network_id, &flat_replies);
+            let reply_items = build_reply_tree(&post, &flat_replies);
+            log_debug(&format!("  Built {} reply items", reply_items.len()));
 
             let _ = result_tx
                 .send(AsyncResult::ContextFetched {
@@ -226,36 +257,44 @@ async fn handle_fetch_context(result_tx: &mpsc::Sender<AsyncResult>, post: Post,
                 .await;
         }
         Err(e) => {
-            // Log the error for debugging
-            eprintln!("Failed to fetch context: {}", e);
+            log_debug(&format!("Failed to fetch context: {}", e));
         }
     }
 }
 
 /// Build a flat list of replies with depth from a threaded structure
-fn build_reply_tree(root_id: &str, replies: &[Post]) -> Vec<ReplyItem> {
+fn build_reply_tree(root_post: &Post, replies: &[Post]) -> Vec<ReplyItem> {
     let mut result = Vec::new();
+
+    // Get the root URI - replies reference this, not just the network_id
+    let root_uri = root_post.uri.as_deref().unwrap_or(&root_post.network_id);
 
     // Find direct replies to the root and recursively add their children
     fn add_replies(
+        parent_uri: &str,
         parent_id: &str,
         all_replies: &[Post],
         result: &mut Vec<ReplyItem>,
         depth: usize,
     ) {
         for reply in all_replies {
-            if reply.reply_to_id.as_deref() == Some(parent_id) {
+            // Check both URI and network_id for parent match
+            let is_reply_to_parent = reply.reply_to_id.as_deref() == Some(parent_uri)
+                || reply.reply_to_id.as_deref() == Some(parent_id);
+
+            if is_reply_to_parent {
+                let reply_uri = reply.uri.as_deref().unwrap_or(&reply.network_id);
                 result.push(ReplyItem {
                     post: reply.clone(),
                     depth,
                 });
                 // Recursively add replies to this reply
-                add_replies(&reply.network_id, all_replies, result, depth + 1);
+                add_replies(reply_uri, &reply.network_id, all_replies, result, depth + 1);
             }
         }
     }
 
-    add_replies(root_id, replies, &mut result, 0);
+    add_replies(root_uri, &root_post.network_id, replies, &mut result, 0);
     result
 }
 
