@@ -206,10 +206,6 @@ fn render_timeline_view(frame: &mut Frame, state: &AppState, area: Rect) {
                 let is_selected = i == state.selected_post;
                 let width = horizontal[0].width.saturating_sub(3) as usize;
 
-                // Preview should use available width minus the indent
-                let preview_width = width.saturating_sub(4); // 3 spaces indent + margin
-                let preview = post.preview(preview_width);
-
                 // Full-width background for selected item
                 let base_style = if is_selected {
                     colors.selected()
@@ -219,18 +215,42 @@ fn render_timeline_view(frame: &mut Frame, state: &AppState, area: Rect) {
 
                 let author_text =
                     format!(" {} @{} · {}{}", icon, post.author_handle, time, indicators);
-                let content_text = format!("   {preview}");
 
-                // Pad lines to full width for selection highlight
+                // Pad author line to full width for selection highlight
                 let author_padded = format!("{author_text:<width$}");
-                let content_padded = format!("{content_text:<width$}");
                 let spacer = format!("{:<width$}", "", width = width);
 
-                ListItem::new(vec![
+                // Build lines: author, blank line, content lines, spacer
+                let mut lines = vec![
                     Line::styled(author_padded, base_style.patch(colors.text_primary())),
-                    Line::styled(content_padded, base_style.patch(colors.text())),
-                    Line::styled(spacer, Style::default()), // Spacer between posts
-                ])
+                    Line::styled(spacer.clone(), base_style), // Space between title and content
+                ];
+
+                // Show full content, wrapping lines to fit width
+                let content_width = width.saturating_sub(4); // 3 spaces indent + margin
+                for line in post.content.lines() {
+                    // Wrap long lines
+                    let chars: Vec<char> = line.chars().collect();
+                    if chars.is_empty() {
+                        let empty_line = format!("{:<width$}", "", width = width);
+                        lines.push(Line::styled(empty_line, base_style.patch(colors.text())));
+                    } else {
+                        for chunk in chars.chunks(content_width) {
+                            let chunk_str: String = chunk.iter().collect();
+                            let content_text = format!("   {chunk_str}");
+                            let content_padded = format!("{content_text:<width$}");
+                            lines.push(Line::styled(
+                                content_padded,
+                                base_style.patch(colors.text()),
+                            ));
+                        }
+                    }
+                }
+
+                // Add spacer between posts
+                lines.push(Line::styled(spacer, Style::default()));
+
+                ListItem::new(lines)
             })
             .collect()
     };
