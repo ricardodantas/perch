@@ -14,8 +14,8 @@ pub fn parse_schedule_time(input: &str) -> Result<DateTime<Utc>> {
     let input = input.trim().to_lowercase();
 
     // Try relative time first
-    if input.starts_with("in ") {
-        return parse_relative_time(&input[3..]);
+    if let Some(rest) = input.strip_prefix("in ") {
+        return parse_relative_time(rest);
     }
 
     // Try ISO 8601 with timezone

@@ -172,13 +172,13 @@ fn handle_async_result(state: &mut AppState, result: AsyncResult) -> Option<Asyn
             state.set_status(format!("Loaded {} posts", state.posts.len()));
 
             // Fetch replies for the first post
-            if let Some(post) = state.selected_post().cloned() {
-                if let Some(account) = state.accounts.iter().find(|a| a.network == post.network) {
-                    return Some(AsyncCommand::FetchContext {
-                        post,
-                        account: account.clone(),
-                    });
-                }
+            if let Some(post) = state.selected_post().cloned()
+                && let Some(account) = state.accounts.iter().find(|a| a.network == post.network)
+            {
+                return Some(AsyncCommand::FetchContext {
+                    post,
+                    account: account.clone(),
+                });
             }
             None
         }

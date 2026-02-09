@@ -440,7 +440,7 @@ fn handle_compose_key(state: &mut AppState, key: KeyEvent) -> Option<AsyncComman
                 state.compose_schedule_focused = false;
                 None
             }
-            (_, KeyCode::Tab) | (_, KeyCode::Enter) => {
+            (_, KeyCode::Tab | KeyCode::Enter) => {
                 // Apply schedule and go back to text
                 if let Err(e) = state.apply_schedule_input() {
                     state.set_status(format!("⚠ Invalid schedule: {}", e));

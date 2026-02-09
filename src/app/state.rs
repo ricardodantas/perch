@@ -388,7 +388,7 @@ impl AppState {
     }
 
     /// Toggle schedule input focus
-    pub fn toggle_schedule_focus(&mut self) {
+    pub const fn toggle_schedule_focus(&mut self) {
         self.compose_schedule_focused = !self.compose_schedule_focused;
     }
 
