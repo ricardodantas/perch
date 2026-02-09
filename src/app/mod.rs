@@ -267,6 +267,8 @@ pub fn run_demo() -> Result<()> {
     state.accounts = demo::demo_accounts();
     state.posts = demo::demo_posts();
     state.focused_panel = state::FocusedPanel::Timeline;
+    // Use Dracula theme for screenshots
+    state.theme = crate::theme::Theme(ratatui_themes::ThemeName::Dracula);
     state.set_status(format!(
         "Demo mode | {} posts | Press ? for help | q to quit",
         state.posts.len()
