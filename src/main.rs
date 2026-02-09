@@ -486,6 +486,7 @@ async fn post_cli(content: &str, networks: &[String], schedule: Option<&str>) ->
 }
 
 /// Handle schedule subcommands
+#[allow(clippy::too_many_lines, clippy::future_not_send)]
 async fn schedule_cli(subcommand: ScheduleSubcommand) -> Result<()> {
     let db = perch::Database::open()?;
 
@@ -620,6 +621,7 @@ async fn schedule_cli(subcommand: ScheduleSubcommand) -> Result<()> {
 }
 
 /// Process a single scheduled post
+#[allow(clippy::future_not_send)]
 async fn process_scheduled_post(db: &perch::Database, post: &perch::ScheduledPost) -> Result<()> {
     let id_short = &post.id.to_string()[..8];
     println!(
@@ -635,9 +637,7 @@ async fn process_scheduled_post(db: &perch::Database, post: &perch::ScheduledPos
     let mut error_msg = String::new();
 
     for network in &post.networks {
-        let account = if let Some(a) = db.get_default_account(*network)? {
-            a
-        } else {
+        let Some(account) = db.get_default_account(*network)? else {
             let msg = format!("No {} account configured", network.name());
             println!("    ⚠️  {}", msg);
             error_msg = msg;
@@ -645,9 +645,7 @@ async fn process_scheduled_post(db: &perch::Database, post: &perch::ScheduledPos
             continue;
         };
 
-        let token = if let Some(t) = perch::auth::get_credentials(&account)? {
-            t
-        } else {
+        let Some(token) = perch::auth::get_credentials(&account)? else {
             let msg = format!("No credentials for {}", account.handle);
             println!("    ⚠️  {}", msg);
             error_msg = msg;
