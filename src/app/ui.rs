@@ -433,6 +433,42 @@ fn render_timeline_view(frame: &mut Frame, state: &mut AppState, area: Rect) {
                     ),
                     colors.text_dim(),
                 )]));
+
+                // Show media attachments for replies
+                if !reply_item.post.media.is_empty() {
+                    for (i, media) in reply_item.post.media.iter().enumerate() {
+                        let media_icon = match media.media_type {
+                            crate::models::MediaType::Image => "🖼️",
+                            crate::models::MediaType::Video => "🎬",
+                            crate::models::MediaType::Gifv => "🎞️",
+                            crate::models::MediaType::Audio => "🎵",
+                            crate::models::MediaType::Unknown => "📎",
+                        };
+                        let url = media.preview_url.as_ref().unwrap_or(&media.url);
+                        let status = if state.loading_images.contains(url) {
+                            " ⏳"
+                        } else if state.image_cache.contains(url) {
+                            " ✓"
+                        } else {
+                            ""
+                        };
+                        let alt = media.alt_text.as_deref().unwrap_or("");
+                        let alt_display = if alt.is_empty() {
+                            String::new()
+                        } else if alt.len() > 40 {
+                            format!(" {:.40}...", alt)
+                        } else {
+                            format!(" {}", alt)
+                        };
+                        detail_content.push(Line::from(vec![
+                            Span::styled(content_indent.clone(), Style::default()),
+                            Span::styled(
+                                format!("[{} {}{}]{}", media_icon, i + 1, status, alt_display),
+                                colors.text_secondary(),
+                            ),
+                        ]));
+                    }
+                }
             }
         } else if state.loading_replies {
             detail_content.push(Line::from(""));

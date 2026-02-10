@@ -472,20 +472,37 @@ impl AppState {
     /// Get URLs of images that should be loaded for the current post.
     /// Returns URLs that are not yet cached or loading.
     pub fn get_images_to_load(&self) -> Vec<String> {
-        let Some(post) = self.selected_post() else {
-            return Vec::new();
-        };
-
         if !self.show_images {
             return Vec::new();
         }
 
-        post.media
-            .iter()
-            .filter(|m| m.media_type == crate::models::MediaType::Image)
-            .map(|m| m.preview_url.as_ref().unwrap_or(&m.url).clone())
-            .filter(|url| !self.image_cache.contains(url) && !self.loading_images.contains(url))
-            .collect()
+        let mut urls = Vec::new();
+
+        // Images from selected post
+        if let Some(post) = self.selected_post() {
+            for media in &post.media {
+                if media.media_type == crate::models::MediaType::Image {
+                    let url = media.preview_url.as_ref().unwrap_or(&media.url).clone();
+                    if !self.image_cache.contains(&url) && !self.loading_images.contains(&url) {
+                        urls.push(url);
+                    }
+                }
+            }
+        }
+
+        // Images from replies (limit to first 5 to avoid loading too many)
+        for reply in self.current_replies.iter().take(5) {
+            for media in &reply.post.media {
+                if media.media_type == crate::models::MediaType::Image {
+                    let url = media.preview_url.as_ref().unwrap_or(&media.url).clone();
+                    if !self.image_cache.contains(&url) && !self.loading_images.contains(&url) {
+                        urls.push(url);
+                    }
+                }
+            }
+        }
+
+        urls
     }
 
     /// Mark images as loading (to avoid duplicate requests).
