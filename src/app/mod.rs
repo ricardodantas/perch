@@ -300,7 +300,7 @@ pub fn run_demo() -> Result<()> {
     // Main loop (simpler, no async)
     loop {
         // Draw UI
-        terminal.draw(|frame| ui::render(frame, &state))?;
+        terminal.draw(|frame| ui::render(frame, &mut state))?;
 
         // Handle events
         if event::poll(Duration::from_millis(50))?

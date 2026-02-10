@@ -7,6 +7,7 @@ use ratatui::{
     text::{Line, Span},
     widgets::{Block, BorderType, Borders, Clear, List, ListItem, Paragraph, Tabs, Wrap},
 };
+use ratatui_image::{StatefulImage};
 
 use super::state::{AppState, FocusedPanel, Mode, TimelineFilter, View};
 use crate::theme::Theme;
@@ -26,7 +27,7 @@ const LOGO: &str = r"
 const ICON: &str = "🐦";
 
 /// Main render function
-pub fn render(frame: &mut Frame, state: &AppState) {
+pub fn render(frame: &mut Frame, state: &mut AppState) {
     let colors = state.theme.colors();
 
     // Set background
@@ -131,14 +132,14 @@ fn render_tabs(frame: &mut Frame, state: &AppState, area: Rect) {
     frame.render_widget(tabs, area);
 }
 
-fn render_main(frame: &mut Frame, state: &AppState, area: Rect) {
+fn render_main(frame: &mut Frame, state: &mut AppState, area: Rect) {
     match state.view {
         View::Timeline => render_timeline_view(frame, state, area),
         View::Accounts => render_accounts_view(frame, state, area),
     }
 }
 
-fn render_timeline_view(frame: &mut Frame, state: &AppState, area: Rect) {
+fn render_timeline_view(frame: &mut Frame, state: &mut AppState, area: Rect) {
     let colors = state.theme.colors();
 
     // Layout: [Timeline 50%] [Detail 50%]
@@ -277,7 +278,7 @@ fn render_timeline_view(frame: &mut Frame, state: &AppState, area: Rect) {
             colors.block()
         });
 
-    if let Some(post) = state.selected_post() {
+    if let Some(post) = state.selected_post().cloned() {
         let like_icon = if post.liked { "❤️" } else { "♡" };
         let repost_icon = if post.reposted { "🔁" } else { "↻" };
 
@@ -441,11 +442,60 @@ fn render_timeline_view(frame: &mut Frame, state: &AppState, area: Rect) {
             )]));
         }
 
+        // Check if we have images to render
+        let image_urls: Vec<String> = if state.show_images {
+            post.media
+                .iter()
+                .filter(|m| m.media_type == crate::models::MediaType::Image)
+                .filter_map(|m| {
+                    let url = m.preview_url.as_ref().unwrap_or(&m.url);
+                    if state.image_cache.contains(url) {
+                        Some(url.clone())
+                    } else {
+                        None
+                    }
+                })
+                .take(1) // Only render first image for now
+                .collect()
+        } else {
+            Vec::new()
+        };
+
+        // Split detail area: text on top, image on bottom (if we have images)
+        let (text_area, image_area) = if !image_urls.is_empty() {
+            let areas = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([
+                    Constraint::Min(10),      // Text content
+                    Constraint::Length(12),   // Image area (12 rows)
+                ])
+                .split(horizontal[1]);
+            (areas[0], Some(areas[1]))
+        } else {
+            (horizontal[1], None)
+        };
+        
         let detail = Paragraph::new(detail_content)
             .block(detail_block)
             .wrap(Wrap { trim: false })
             .scroll((state.detail_scroll, 0));
-        frame.render_widget(detail, horizontal[1]);
+        frame.render_widget(detail, text_area);
+
+        // Render first image if available
+        if let (Some(image_url), Some(img_area)) = (image_urls.first(), image_area) {
+            // Add some padding
+            let inner_area = Rect {
+                x: img_area.x + 2,
+                y: img_area.y,
+                width: img_area.width.saturating_sub(4),
+                height: img_area.height,
+            };
+            
+            if let Some(protocol) = state.get_image_protocol(image_url) {
+                let image_widget = StatefulImage::new();
+                frame.render_stateful_widget(image_widget, inner_area, protocol);
+            }
+        }
     } else {
         let empty = Paragraph::new(vec![
             Line::from(""),

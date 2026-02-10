@@ -198,6 +198,8 @@ pub struct AppState {
     pub show_images: bool,
     /// URLs of images currently being loaded
     pub loading_images: std::collections::HashSet<String>,
+    /// Image protocol states for rendering (keyed by URL)
+    pub image_protocols: std::collections::HashMap<String, ratatui_image::protocol::StatefulProtocol>,
 }
 
 impl AppState {
@@ -250,6 +252,7 @@ impl AppState {
             image_cache: ImageCache::new(),
             show_images: true,
             loading_images: std::collections::HashSet::new(),
+            image_protocols: std::collections::HashMap::new(),
         })
     }
 
@@ -490,5 +493,26 @@ impl AppState {
         for url in urls {
             self.loading_images.insert(url.clone());
         }
+    }
+
+    /// Get or create a StatefulProtocol for rendering an image.
+    /// Returns None if image is not cached or picker is not available.
+    pub fn get_image_protocol(
+        &mut self,
+        url: &str,
+    ) -> Option<&mut ratatui_image::protocol::StatefulProtocol> {
+        // If already have a protocol, return it
+        if self.image_protocols.contains_key(url) {
+            return self.image_protocols.get_mut(url);
+        }
+
+        // Try to create one from cached image
+        let image = self.image_cache.get(url)?;
+        let picker = crate::images::picker()?;
+
+        // Create the protocol state
+        let protocol = picker.new_resize_protocol((*image).clone());
+        self.image_protocols.insert(url.to_string(), protocol);
+        self.image_protocols.get_mut(url)
     }
 }
