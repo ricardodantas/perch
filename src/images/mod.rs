@@ -46,7 +46,10 @@ pub fn picker() -> Option<&'static Picker> {
 
 /// Check if terminal supports native graphics (not just halfblocks).
 pub fn has_native_graphics() -> bool {
-    picker()
-        .map(|p| !matches!(p.protocol_type(), ratatui_image::picker::ProtocolType::Halfblocks))
-        .unwrap_or(false)
+    picker().is_some_and(|p| {
+        !matches!(
+            p.protocol_type(),
+            ratatui_image::picker::ProtocolType::Halfblocks
+        )
+    })
 }

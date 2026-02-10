@@ -199,7 +199,8 @@ pub struct AppState {
     /// URLs of images currently being loaded
     pub loading_images: std::collections::HashSet<String>,
     /// Image protocol states for rendering (keyed by URL)
-    pub image_protocols: std::collections::HashMap<String, ratatui_image::protocol::StatefulProtocol>,
+    pub image_protocols:
+        std::collections::HashMap<String, ratatui_image::protocol::StatefulProtocol>,
 }
 
 impl AppState {
@@ -512,7 +513,7 @@ impl AppState {
         }
     }
 
-    /// Get or create a StatefulProtocol for rendering an image.
+    /// Get or create a `StatefulProtocol` for rendering an image.
     /// Returns None if image is not cached or picker is not available.
     pub fn get_image_protocol(
         &mut self,

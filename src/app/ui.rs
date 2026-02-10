@@ -7,7 +7,7 @@ use ratatui::{
     text::{Line, Span},
     widgets::{Block, BorderType, Borders, Clear, List, ListItem, Paragraph, Tabs, Wrap},
 };
-use ratatui_image::{StatefulImage};
+use ratatui_image::StatefulImage;
 
 use super::state::{AppState, FocusedPanel, Mode, TimelineFilter, View};
 use crate::theme::Theme;
@@ -329,7 +329,10 @@ fn render_timeline_view(frame: &mut Frame, state: &mut AppState, area: Rect) {
                 };
                 detail_content.push(Line::from(vec![
                     Span::styled("  ", Style::default()),
-                    Span::styled(format!("[{} {}{}]", media_type, i + 1, loading), colors.text_secondary()),
+                    Span::styled(
+                        format!("[{} {}{}]", media_type, i + 1, loading),
+                        colors.text_secondary(),
+                    ),
                     Span::styled(format!(" {}", alt), colors.text_dim()),
                 ]));
             }
@@ -483,7 +486,7 @@ fn render_timeline_view(frame: &mut Frame, state: &mut AppState, area: Rect) {
             post.media
                 .iter()
                 .filter(|m| m.media_type == crate::models::MediaType::Image)
-                .filter_map(|m| {
+                .find_map(|m| {
                     let url = m.preview_url.as_ref().unwrap_or(&m.url);
                     // Only include if we can actually render it
                     if state.image_cache.contains(url) && state.image_protocols.contains_key(url) {
@@ -492,7 +495,6 @@ fn render_timeline_view(frame: &mut Frame, state: &mut AppState, area: Rect) {
                         None
                     }
                 })
-                .next()
         } else {
             None
         };
@@ -502,15 +504,15 @@ fn render_timeline_view(frame: &mut Frame, state: &mut AppState, area: Rect) {
             let areas = Layout::default()
                 .direction(Direction::Vertical)
                 .constraints([
-                    Constraint::Min(10),      // Text content
-                    Constraint::Length(12),   // Image area (12 rows)
+                    Constraint::Min(10),    // Text content
+                    Constraint::Length(12), // Image area (12 rows)
                 ])
                 .split(horizontal[1]);
             (areas[0], Some(areas[1]))
         } else {
             (horizontal[1], None)
         };
-        
+
         let detail = Paragraph::new(detail_content)
             .block(detail_block)
             .wrap(Wrap { trim: false })
@@ -526,7 +528,7 @@ fn render_timeline_view(frame: &mut Frame, state: &mut AppState, area: Rect) {
                 width: img_area.width.saturating_sub(4),
                 height: img_area.height,
             };
-            
+
             if let Some(protocol) = state.get_image_protocol(&image_url) {
                 let image_widget = StatefulImage::new();
                 frame.render_stateful_widget(image_widget, inner_area, protocol);

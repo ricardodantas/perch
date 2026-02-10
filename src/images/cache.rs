@@ -42,16 +42,19 @@ impl ImageCache {
     /// Store a decoded image in the cache.
     pub fn insert(&self, url: &str, image: DynamicImage) {
         let mut cache = self.images.lock().unwrap();
-        
+
         // Evict oldest entries if cache is full
         if cache.len() >= MAX_CACHE_SIZE {
-            self.evict_oldest(&mut cache);
+            Self::evict_oldest(&mut cache);
         }
-        
-        cache.insert(url.to_string(), CachedImage {
-            image: Arc::new(image),
-            last_access: std::time::Instant::now(),
-        });
+
+        cache.insert(
+            url.to_string(),
+            CachedImage {
+                image: Arc::new(image),
+                last_access: std::time::Instant::now(),
+            },
+        );
     }
 
     /// Get a decoded image from cache.
@@ -71,7 +74,7 @@ impl ImageCache {
     }
 
     /// Evict the oldest entry from the cache.
-    fn evict_oldest(&self, cache: &mut HashMap<String, CachedImage>) {
+    fn evict_oldest(cache: &mut HashMap<String, CachedImage>) {
         if let Some((oldest_key, _)) = cache
             .iter()
             .min_by_key(|(_, v)| v.last_access)

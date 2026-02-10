@@ -120,34 +120,34 @@ async fn download_and_decode(
     url: &str,
 ) -> Result<DynamicImage, Box<dyn std::error::Error + Send + Sync>> {
     tracing::debug!("Downloading image: {url}");
-    
+
     let response = client.get(url).send().await?;
-    
+
     if !response.status().is_success() {
         return Err(format!("HTTP {}", response.status()).into());
     }
-    
+
     let bytes = response.bytes().await?;
-    
+
     // Decode the image
     let image = image::load_from_memory(&bytes)?;
-    
+
     // Optionally resize large images to save memory
     let image = resize_if_needed(image);
-    
+
     Ok(image)
 }
 
 /// Resize image if it's too large (to save memory and rendering time).
 fn resize_if_needed(image: DynamicImage) -> DynamicImage {
     const MAX_DIMENSION: u32 = 800;
-    
+
     let (width, height) = (image.width(), image.height());
-    
+
     if width <= MAX_DIMENSION && height <= MAX_DIMENSION {
         return image;
     }
-    
+
     // Calculate new dimensions maintaining aspect ratio
     let ratio = f64::from(width) / f64::from(height);
     let (new_width, new_height) = if width > height {
@@ -155,6 +155,6 @@ fn resize_if_needed(image: DynamicImage) -> DynamicImage {
     } else {
         ((f64::from(MAX_DIMENSION) * ratio) as u32, MAX_DIMENSION)
     };
-    
+
     image.resize(new_width, new_height, image::imageops::FilterType::Triangle)
 }

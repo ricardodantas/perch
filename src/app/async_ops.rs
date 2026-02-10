@@ -83,7 +83,10 @@ pub enum AsyncResult {
     /// Post was scheduled
     Scheduled { id: String, scheduled_for: String },
     /// Image loaded successfully
-    ImageLoaded { url: String, image: image::DynamicImage },
+    ImageLoaded {
+        url: String,
+        image: image::DynamicImage,
+    },
     /// Image loading failed
     ImageFailed { url: String, error: String },
     /// An error occurred
@@ -613,7 +616,7 @@ async fn handle_schedule_post(
 /// Handle image loading from URL
 async fn handle_load_image(result_tx: &mpsc::Sender<AsyncResult>, url: String) {
     log_debug(&format!("Loading image: {}", url));
-    
+
     // Download the image
     let response = match reqwest::get(&url).await {
         Ok(resp) => resp,
@@ -702,9 +705,5 @@ fn resize_if_needed(image: image::DynamicImage) -> image::DynamicImage {
         ((f64::from(MAX_DIMENSION) * ratio) as u32, MAX_DIMENSION)
     };
 
-    image.resize(
-        new_width,
-        new_height,
-        image::imageops::FilterType::Triangle,
-    )
+    image.resize(new_width, new_height, image::imageops::FilterType::Triangle)
 }
