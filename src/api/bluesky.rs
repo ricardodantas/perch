@@ -740,7 +740,6 @@ struct Embed {
 
 #[derive(Debug, Deserialize, Clone)]
 struct EmbedImage {
-    #[allow(dead_code)]
     thumb: String,
     fullsize: String,
     alt: Option<String>,
@@ -854,7 +853,7 @@ fn post_view_to_post(post_view: PostView) -> Post {
                 .into_iter()
                 .map(|img| MediaAttachment {
                     url: img.fullsize,
-                    preview_url: None,
+                    preview_url: Some(img.thumb),
                     media_type: MediaType::Image,
                     alt_text: img.alt,
                 })
@@ -939,7 +938,7 @@ impl FeedViewPost {
                     .into_iter()
                     .map(|img| MediaAttachment {
                         url: img.fullsize,
-                        preview_url: None,
+                        preview_url: Some(img.thumb),
                         media_type: MediaType::Image,
                         alt_text: img.alt,
                     })
