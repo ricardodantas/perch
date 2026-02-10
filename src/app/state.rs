@@ -5,6 +5,7 @@ use chrono::{DateTime, Utc};
 
 use crate::config::Config;
 use crate::db::Database;
+use crate::images::ImageCache;
 use crate::models::{Account, Network, Post};
 use crate::theme::Theme;
 
@@ -190,6 +191,13 @@ pub struct AppState {
     pub update_status: Option<String>,
     /// Flag to trigger update on next tick
     pub pending_update: bool,
+
+    /// Image cache for media attachments
+    pub image_cache: ImageCache,
+    /// Whether to show images in detail view
+    pub show_images: bool,
+    /// URLs of images currently being loaded
+    pub loading_images: std::collections::HashSet<String>,
 }
 
 impl AppState {
@@ -239,6 +247,9 @@ impl AppState {
             package_manager: crate::update::detect_package_manager(),
             update_status: None,
             pending_update: false,
+            image_cache: ImageCache::new(),
+            show_images: true,
+            loading_images: std::collections::HashSet::new(),
         })
     }
 
@@ -453,5 +464,31 @@ impl AppState {
             View::Timeline => View::Accounts,
             View::Accounts => View::Timeline,
         };
+    }
+
+    /// Get URLs of images that should be loaded for the current post.
+    /// Returns URLs that are not yet cached or loading.
+    pub fn get_images_to_load(&self) -> Vec<String> {
+        let Some(post) = self.selected_post() else {
+            return Vec::new();
+        };
+
+        if !self.show_images {
+            return Vec::new();
+        }
+
+        post.media
+            .iter()
+            .filter(|m| m.media_type == crate::models::MediaType::Image)
+            .map(|m| m.preview_url.as_ref().unwrap_or(&m.url).clone())
+            .filter(|url| !self.image_cache.contains(url) && !self.loading_images.contains(url))
+            .collect()
+    }
+
+    /// Mark images as loading (to avoid duplicate requests).
+    pub fn mark_images_loading(&mut self, urls: &[String]) {
+        for url in urls {
+            self.loading_images.insert(url.clone());
+        }
     }
 }

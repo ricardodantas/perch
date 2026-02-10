@@ -49,6 +49,8 @@ pub enum AsyncCommand {
         networks: Vec<Network>,
         scheduled_for: chrono::DateTime<chrono::Utc>,
     },
+    /// Load an image from a URL
+    LoadImage { url: String },
     /// Shutdown the worker
     Shutdown,
 }
@@ -80,6 +82,10 @@ pub enum AsyncResult {
     Posted { posts: Vec<Post> },
     /// Post was scheduled
     Scheduled { id: String, scheduled_for: String },
+    /// Image loaded successfully
+    ImageLoaded { url: String, image: image::DynamicImage },
+    /// Image loading failed
+    ImageFailed { url: String, error: String },
     /// An error occurred
     Error { message: String },
     /// Status message (for progress updates)
@@ -135,6 +141,9 @@ pub fn spawn_worker() -> AsyncHandle {
                     scheduled_for,
                 } => {
                     handle_schedule_post(&result_tx, content, networks, scheduled_for).await;
+                }
+                AsyncCommand::LoadImage { url } => {
+                    handle_load_image(&result_tx, url).await;
                 }
             }
         }
@@ -599,4 +608,103 @@ async fn handle_schedule_post(
             message: format!("📅 Scheduled for {} (in {})", scheduled_for_str, time_until),
         })
         .await;
+}
+
+/// Handle image loading from URL
+async fn handle_load_image(result_tx: &mpsc::Sender<AsyncResult>, url: String) {
+    log_debug(&format!("Loading image: {}", url));
+    
+    // Download the image
+    let response = match reqwest::get(&url).await {
+        Ok(resp) => resp,
+        Err(e) => {
+            log_debug(&format!("Failed to fetch image: {}", e));
+            let _ = result_tx
+                .send(AsyncResult::ImageFailed {
+                    url,
+                    error: e.to_string(),
+                })
+                .await;
+            return;
+        }
+    };
+
+    if !response.status().is_success() {
+        let status = response.status();
+        log_debug(&format!("Image fetch failed with status: {}", status));
+        let _ = result_tx
+            .send(AsyncResult::ImageFailed {
+                url,
+                error: format!("HTTP {}", status),
+            })
+            .await;
+        return;
+    }
+
+    let bytes = match response.bytes().await {
+        Ok(b) => b,
+        Err(e) => {
+            log_debug(&format!("Failed to read image bytes: {}", e));
+            let _ = result_tx
+                .send(AsyncResult::ImageFailed {
+                    url,
+                    error: e.to_string(),
+                })
+                .await;
+            return;
+        }
+    };
+
+    // Decode the image
+    let image = match image::load_from_memory(&bytes) {
+        Ok(img) => img,
+        Err(e) => {
+            log_debug(&format!("Failed to decode image: {}", e));
+            let _ = result_tx
+                .send(AsyncResult::ImageFailed {
+                    url,
+                    error: e.to_string(),
+                })
+                .await;
+            return;
+        }
+    };
+
+    // Optionally resize if too large
+    let image = resize_if_needed(image);
+
+    log_debug(&format!(
+        "Image loaded successfully: {}x{}",
+        image.width(),
+        image.height()
+    ));
+
+    let _ = result_tx
+        .send(AsyncResult::ImageLoaded { url, image })
+        .await;
+}
+
+/// Resize image if it's too large (to save memory and rendering time).
+fn resize_if_needed(image: image::DynamicImage) -> image::DynamicImage {
+    const MAX_DIMENSION: u32 = 800;
+
+    let (width, height) = (image.width(), image.height());
+
+    if width <= MAX_DIMENSION && height <= MAX_DIMENSION {
+        return image;
+    }
+
+    // Calculate new dimensions maintaining aspect ratio
+    let ratio = f64::from(width) / f64::from(height);
+    let (new_width, new_height) = if width > height {
+        (MAX_DIMENSION, (f64::from(MAX_DIMENSION) / ratio) as u32)
+    } else {
+        ((f64::from(MAX_DIMENSION) * ratio) as u32, MAX_DIMENSION)
+    };
+
+    image.resize(
+        new_width,
+        new_height,
+        image::imageops::FilterType::Triangle,
+    )
 }

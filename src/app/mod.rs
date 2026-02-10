@@ -143,6 +143,17 @@ fn run_app(
             let _ = async_handle.cmd_tx.blocking_send(cmd);
         }
 
+        // Queue image loading for current post
+        let images_to_load = state.get_images_to_load();
+        if !images_to_load.is_empty() {
+            state.mark_images_loading(&images_to_load);
+            for url in images_to_load {
+                let _ = async_handle
+                    .cmd_tx
+                    .blocking_send(AsyncCommand::LoadImage { url });
+            }
+        }
+
         // Tick for animations
         state.tick();
 
@@ -241,6 +252,18 @@ fn handle_async_result(state: &mut AppState, result: AsyncResult) -> Option<Asyn
         }
         AsyncResult::Status { message } => {
             state.set_status(message);
+            None
+        }
+        AsyncResult::ImageLoaded { url, image } => {
+            state.loading_images.remove(&url);
+            state.image_cache.insert(&url, image);
+            // No status message - images load quietly
+            None
+        }
+        AsyncResult::ImageFailed { url, error } => {
+            state.loading_images.remove(&url);
+            tracing::warn!("Failed to load image {}: {}", url, error);
+            // Don't show error in status bar - would be too noisy
             None
         }
     }

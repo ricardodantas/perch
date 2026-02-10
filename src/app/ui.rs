@@ -307,6 +307,33 @@ fn render_timeline_view(frame: &mut Frame, state: &AppState, area: Rect) {
             ]));
         }
 
+        // Show media attachments indicator
+        if !post.media.is_empty() {
+            detail_content.push(Line::from(""));
+            for (i, media) in post.media.iter().enumerate() {
+                let media_type = match media.media_type {
+                    crate::models::MediaType::Image => "🖼️ Image",
+                    crate::models::MediaType::Video => "🎬 Video",
+                    crate::models::MediaType::Gifv => "🎞️ GIF",
+                    crate::models::MediaType::Audio => "🎵 Audio",
+                    crate::models::MediaType::Unknown => "📎 Attachment",
+                };
+                let alt = media.alt_text.as_deref().unwrap_or("no description");
+                let loading = if state.loading_images.contains(&media.url) {
+                    " ⏳"
+                } else if state.image_cache.contains(&media.url) {
+                    " ✓"
+                } else {
+                    ""
+                };
+                detail_content.push(Line::from(vec![
+                    Span::styled("  ", Style::default()),
+                    Span::styled(format!("[{} {}{}]", media_type, i + 1, loading), colors.text_secondary()),
+                    Span::styled(format!(" {}", alt), colors.text_dim()),
+                ]));
+            }
+        }
+
         detail_content.push(Line::from(""));
         detail_content.push(Line::from("  ─────────────────────────────────"));
         detail_content.push(Line::from(""));

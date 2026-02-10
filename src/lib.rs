@@ -103,6 +103,7 @@ pub mod auth;
 pub mod config;
 pub mod db;
 pub mod demo;
+pub mod images;
 pub mod models;
 pub mod paths;
 pub mod schedule;

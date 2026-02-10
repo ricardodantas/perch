@@ -65,6 +65,10 @@ regex-lite = "0.1.9"
 
 # TOML for config
 toml = "0.9"
+
+# Image support for terminal graphics
+ratatui-image = { version = "10", default-features = false, features = ["crossterm", "image-defaults"] }
+image = "0.25"
 ctrlc = { version = "3.5.1", features = ["termination"] }
 
 [dev-dependencies]
