@@ -442,27 +442,27 @@ fn render_timeline_view(frame: &mut Frame, state: &mut AppState, area: Rect) {
             )]));
         }
 
-        // Check if we have images to render
-        let image_urls: Vec<String> = if state.show_images {
+        // Check if we have images ready to render (in cache with protocol)
+        let image_to_render: Option<String> = if state.show_images {
             post.media
                 .iter()
                 .filter(|m| m.media_type == crate::models::MediaType::Image)
                 .filter_map(|m| {
                     let url = m.preview_url.as_ref().unwrap_or(&m.url);
-                    if state.image_cache.contains(url) {
+                    // Only include if we can actually render it
+                    if state.image_cache.contains(url) && state.image_protocols.contains_key(url) {
                         Some(url.clone())
                     } else {
                         None
                     }
                 })
-                .take(1) // Only render first image for now
-                .collect()
+                .next()
         } else {
-            Vec::new()
+            None
         };
 
-        // Split detail area: text on top, image on bottom (if we have images)
-        let (text_area, image_area) = if !image_urls.is_empty() {
+        // Split detail area only if we have an image ready to render
+        let (text_area, image_area) = if image_to_render.is_some() {
             let areas = Layout::default()
                 .direction(Direction::Vertical)
                 .constraints([
@@ -481,8 +481,8 @@ fn render_timeline_view(frame: &mut Frame, state: &mut AppState, area: Rect) {
             .scroll((state.detail_scroll, 0));
         frame.render_widget(detail, text_area);
 
-        // Render first image if available
-        if let (Some(image_url), Some(img_area)) = (image_urls.first(), image_area) {
+        // Render image if available
+        if let (Some(image_url), Some(img_area)) = (image_to_render, image_area) {
             // Add some padding
             let inner_area = Rect {
                 x: img_area.x + 2,
@@ -491,7 +491,7 @@ fn render_timeline_view(frame: &mut Frame, state: &mut AppState, area: Rect) {
                 height: img_area.height,
             };
             
-            if let Some(protocol) = state.get_image_protocol(image_url) {
+            if let Some(protocol) = state.get_image_protocol(&image_url) {
                 let image_widget = StatefulImage::new();
                 frame.render_stateful_widget(image_widget, inner_area, protocol);
             }

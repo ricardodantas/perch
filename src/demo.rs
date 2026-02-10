@@ -3,7 +3,7 @@
 use chrono::{Duration, Utc};
 use uuid::Uuid;
 
-use crate::models::{Account, Network, Post};
+use crate::models::{Account, MediaAttachment, MediaType, Network, Post};
 
 /// Generate demo accounts
 pub fn demo_accounts() -> Vec<Account> {
@@ -57,7 +57,14 @@ pub fn demo_posts() -> Vec<Post> {
             liked: true,
             reposted: false,
             reply_to_id: None,
-            media: Vec::new(),
+            media: vec![
+                MediaAttachment {
+                    url: "https://files.mastodon.social/media_attachments/files/123/456/789/original/mastodon43.png".to_string(),
+                    preview_url: Some("https://files.mastodon.social/media_attachments/files/123/456/789/small/mastodon43.png".to_string()),
+                    media_type: MediaType::Image,
+                    alt_text: Some("Mastodon 4.3 release banner showing new features".to_string()),
+                },
+            ],
             cid: None,
             uri: None,
         },
