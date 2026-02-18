@@ -8,7 +8,7 @@ Perch is a Rust-based terminal application for browsing and posting to decentral
 
 - **Type:** Command-line application / TUI
 - **Language:** Rust
-- **License:** MIT
+- **License:** GPL-3.0-or-later
 - **Platforms:** macOS, Linux, Windows
 - **Repository:** https://github.com/ricardodantas/perch
 - **Documentation:** https://perch.ricardodantas.me/docs
