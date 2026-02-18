@@ -411,9 +411,8 @@ pub mod oauth {
             );
         }
 
-        serde_json::from_str(&body).with_context(|| {
-            format!("Failed to parse app registration response: {body}")
-        })
+        serde_json::from_str(&body)
+            .with_context(|| format!("Failed to parse app registration response: {body}"))
     }
 
     /// Get the authorization URL for the user to visit
