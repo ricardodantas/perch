@@ -397,10 +397,23 @@ pub mod oauth {
             .await
             .context("Failed to register app")?;
 
-        response
-            .json()
+        let status = response.status();
+        let body = response
+            .text()
             .await
-            .context("Failed to parse app registration response")
+            .context("Failed to read app registration response")?;
+
+        if !status.is_success() {
+            anyhow::bail!(
+                "App registration failed (HTTP {}): {}",
+                status.as_u16(),
+                body
+            );
+        }
+
+        serde_json::from_str(&body).with_context(|| {
+            format!("Failed to parse app registration response: {body}")
+        })
     }
 
     /// Get the authorization URL for the user to visit
@@ -439,9 +452,17 @@ pub mod oauth {
             .await
             .context("Failed to get access token")?;
 
-        response
-            .json()
+        let status = response.status();
+        let body = response
+            .text()
             .await
-            .context("Failed to parse token response")
+            .context("Failed to read token response")?;
+
+        if !status.is_success() {
+            anyhow::bail!("Token exchange failed (HTTP {}): {}", status.as_u16(), body);
+        }
+
+        serde_json::from_str(&body)
+            .with_context(|| format!("Failed to parse token response: {body}"))
     }
 }
