@@ -379,20 +379,23 @@ pub mod oauth {
     }
 
     /// Register an OAuth application with an instance
+    ///
+    /// Uses JSON request body for compatibility with GoToSocial and other
+    /// Mastodon-compatible ActivityPub servers.
     pub async fn register_app(instance: &str) -> Result<OAuthApp> {
         let client = Client::new();
         let url = format!("{}/api/v1/apps", instance.trim_end_matches('/'));
 
-        let params = [
-            ("client_name", "Perch"),
-            ("redirect_uris", "urn:ietf:wg:oauth:2.0:oob"),
-            ("scopes", "read write follow"),
-            ("website", "https://github.com/ricardodantas/perch"),
-        ];
+        let params = serde_json::json!({
+            "client_name": "Perch",
+            "redirect_uris": "urn:ietf:wg:oauth:2.0:oob",
+            "scopes": "read write follow",
+            "website": "https://github.com/ricardodantas/perch"
+        });
 
         let response = client
             .post(&url)
-            .form(&params)
+            .json(&params)
             .send()
             .await
             .context("Failed to register app")?;
@@ -411,8 +414,13 @@ pub mod oauth {
             );
         }
 
-        serde_json::from_str(&body)
-            .with_context(|| format!("Failed to parse app registration response: {body}"))
+        serde_json::from_str(&body).with_context(|| {
+            format!(
+                "Failed to parse app registration response (HTTP {}):\n{}",
+                status.as_u16(),
+                body
+            )
+        })
     }
 
     /// Get the authorization URL for the user to visit
