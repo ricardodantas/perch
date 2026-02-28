@@ -9,6 +9,16 @@ use crate::models::{Account, MediaAttachment, MediaType, Network, Post};
 
 use super::SocialApi;
 
+/// Build a reqwest client with a proper User-Agent header.
+/// GoToSocial (and potentially other ActivityPub servers) reject requests
+/// without a User-Agent with HTTP 418 "I'm a teapot".
+fn http_client() -> Client {
+    Client::builder()
+        .user_agent(format!("Perch/{}", env!("CARGO_PKG_VERSION")))
+        .build()
+        .expect("Failed to build HTTP client")
+}
+
 /// Mastodon API client
 pub struct MastodonClient {
     client: Client,
@@ -20,7 +30,7 @@ impl MastodonClient {
     /// Create a new Mastodon client
     pub fn new(instance: &str, access_token: &str) -> Self {
         Self {
-            client: Client::new(),
+            client: http_client(),
             instance: instance.trim_end_matches('/').to_string(),
             access_token: access_token.to_string(),
         }
@@ -360,6 +370,13 @@ impl MastodonStatus {
 pub mod oauth {
     use super::{Client, Context, Deserialize, Result};
 
+    fn http_client() -> Client {
+        Client::builder()
+            .user_agent(format!("Perch/{}", env!("CARGO_PKG_VERSION")))
+            .build()
+            .expect("Failed to build HTTP client")
+    }
+
     /// Registered OAuth application credentials
     #[derive(Debug, Deserialize)]
     pub struct OAuthApp {
@@ -383,7 +400,7 @@ pub mod oauth {
     /// Uses JSON request body for compatibility with GoToSocial and other
     /// Mastodon-compatible ActivityPub servers.
     pub async fn register_app(instance: &str) -> Result<OAuthApp> {
-        let client = Client::new();
+        let client = http_client();
         let url = format!("{}/api/v1/apps", instance.trim_end_matches('/'));
 
         let params = serde_json::json!({
@@ -440,7 +457,7 @@ pub mod oauth {
         client_secret: &str,
         code: &str,
     ) -> Result<OAuthToken> {
-        let client = Client::new();
+        let client = http_client();
         let url = format!("{}/oauth/token", instance.trim_end_matches('/'));
 
         let params = [

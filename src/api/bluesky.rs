@@ -9,6 +9,14 @@ use crate::models::{Account, MediaAttachment, MediaType, Network, Post};
 
 use super::SocialApi;
 
+/// Build a reqwest client with a proper User-Agent header.
+fn http_client() -> Client {
+    Client::builder()
+        .user_agent(format!("Perch/{}", env!("CARGO_PKG_VERSION")))
+        .build()
+        .expect("Failed to build HTTP client")
+}
+
 /// Default PDS URL for Bluesky
 pub const DEFAULT_PDS_URL: &str = "https://bsky.social";
 
@@ -28,7 +36,7 @@ impl BlueskyClient {
 
     /// Login to Bluesky with a custom PDS URL
     pub async fn login_with_pds(handle: &str, app_password: &str, pds_url: &str) -> Result<Self> {
-        let client = Client::new();
+        let client = http_client();
         let pds_url = pds_url.trim_end_matches('/').to_string();
 
         let url = format!("{pds_url}/xrpc/com.atproto.server.createSession");
@@ -66,7 +74,7 @@ impl BlueskyClient {
     /// Create a new client with existing credentials
     pub fn new(pds_url: &str, access_jwt: &str, did: &str) -> Self {
         Self {
-            client: Client::new(),
+            client: http_client(),
             pds_url: pds_url.to_string(),
             access_jwt: access_jwt.to_string(),
             did: did.to_string(),
