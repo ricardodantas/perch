@@ -11,5 +11,8 @@
   },
   "dependencies": {
     "astro": "^5.17.1"
+  },
+  "overrides": {
+    "rollup": ">=4.59.0"
   }
 }
