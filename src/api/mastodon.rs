@@ -10,7 +10,7 @@ use crate::models::{Account, MediaAttachment, MediaType, Network, Post};
 use super::SocialApi;
 
 /// Build a reqwest client with a proper User-Agent header.
-/// GoToSocial (and potentially other ActivityPub servers) reject requests
+/// `GoToSocial` (and potentially other `ActivityPub` servers) reject requests
 /// without a User-Agent with HTTP 418 "I'm a teapot".
 fn http_client() -> Client {
     Client::builder()
@@ -397,8 +397,8 @@ pub mod oauth {
 
     /// Register an OAuth application with an instance
     ///
-    /// Uses JSON request body for compatibility with GoToSocial and other
-    /// Mastodon-compatible ActivityPub servers.
+    /// Uses JSON request body for compatibility with `GoToSocial` and other
+    /// Mastodon-compatible `ActivityPub` servers.
     pub async fn register_app(instance: &str) -> Result<OAuthApp> {
         let client = http_client();
         let url = format!("{}/api/v1/apps", instance.trim_end_matches('/'));
