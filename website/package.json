@@ -10,7 +10,7 @@
     "astro": "astro"
   },
   "dependencies": {
-    "astro": "^5.17.1"
+    "astro": "^6.1.6"
   },
   "overrides": {
     "rollup": ">=4.59.0"
