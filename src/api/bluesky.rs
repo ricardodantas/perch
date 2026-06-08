@@ -721,6 +721,7 @@ struct PostRecord {
     #[serde(rename = "$type")]
     r#type: String,
     /// Reply reference (parent and root)
+    #[serde(skip_serializing_if = "Option::is_none")]
     reply: Option<ReplyRef>,
 }
 
@@ -997,5 +998,35 @@ impl FeedViewPost {
             cid: Some(self.post.cid),
             uri: Some(self.post.uri),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn create_post_record_omits_empty_reply() {
+        let record = PostRecord {
+            text: "hello from perch".to_string(),
+            created_at: "2026-06-08T12:00:00.000Z".to_string(),
+            r#type: "app.bsky.feed.post".to_string(),
+            reply: None,
+        };
+
+        let request = CreateRecordRequest {
+            repo: "did:plc:example".to_string(),
+            collection: "app.bsky.feed.post".to_string(),
+            record,
+        };
+
+        let json = serde_json::to_value(request).expect("post record should serialize");
+        let record = json
+            .get("record")
+            .expect("createRecord payload should contain record");
+
+        assert!(record.get("reply").is_none());
+        assert_eq!(record["text"], "hello from perch");
+        assert_eq!(record["$type"], "app.bsky.feed.post");
     }
 }
