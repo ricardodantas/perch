@@ -97,6 +97,8 @@ pub enum AsyncResult {
     Error { message: String },
     /// Status message (for progress updates)
     Status { message: String },
+    /// A Bluesky session reported a DID the account has no record of
+    SessionDid { account_id: uuid::Uuid, did: String },
 }
 
 /// Channel handles for communicating with the async worker
@@ -198,7 +200,7 @@ async fn handle_refresh(result_tx: &mpsc::Sender<AsyncResult>, accounts: Vec<Acc
             }
         };
 
-        match fetch_timeline(account, &token).await {
+        match fetch_timeline(result_tx, account, &token).await {
             Ok(posts) => {
                 all_posts.extend(posts);
             }
@@ -244,7 +246,7 @@ async fn handle_hashtag_timeline(
 
     for account in &accounts {
         let result = match auth::get_credentials(account) {
-            Ok(Some(token)) => match get_client(account, &token).await {
+            Ok(Some(token)) => match connect(result_tx, account, &token).await {
                 Ok(client) => client.hashtag_timeline(&tag, 40).await,
                 Err(e) => Err(e),
             },
@@ -282,8 +284,34 @@ fn merge_timeline_posts(mut posts: Vec<Post>) -> Vec<Post> {
     posts
 }
 
-async fn fetch_timeline(account: &Account, token: &str) -> Result<Vec<Post>> {
+/// Create an API client. If it is a Bluesky session whose DID the account
+/// doesn't have stored, report it so the main loop can record it (no extra
+/// request: the DID comes from `createSession`).
+async fn connect(
+    result_tx: &mpsc::Sender<AsyncResult>,
+    account: &Account,
+    token: &str,
+) -> Result<crate::api::Client> {
     let client = get_client(account, token).await?;
+    if let Some(did) = client.session_did()
+        && account.did.as_deref() != Some(did)
+    {
+        let _ = result_tx
+            .send(AsyncResult::SessionDid {
+                account_id: account.id,
+                did: did.to_string(),
+            })
+            .await;
+    }
+    Ok(client)
+}
+
+async fn fetch_timeline(
+    result_tx: &mpsc::Sender<AsyncResult>,
+    account: &Account,
+    token: &str,
+) -> Result<Vec<Post>> {
+    let client = connect(result_tx, account, token).await?;
     client.timeline(50).await
 }
 
@@ -296,7 +324,7 @@ async fn handle_fetch_context(result_tx: &mpsc::Sender<AsyncResult>, post: Post,
         }
     };
 
-    let client = match get_client(&account, &token).await {
+    let client = match connect(result_tx, &account, &token).await {
         Ok(c) => c,
         Err(e) => {
             log_debug(&format!("Failed to get client: {}", e));
@@ -392,7 +420,7 @@ async fn handle_like(result_tx: &mpsc::Sender<AsyncResult>, post: Post, account:
         }
     };
 
-    let client = match get_client(&account, &token).await {
+    let client = match connect(result_tx, &account, &token).await {
         Ok(c) => c,
         Err(e) => {
             let _ = result_tx
@@ -428,7 +456,7 @@ async fn handle_unlike(result_tx: &mpsc::Sender<AsyncResult>, post: Post, accoun
         _ => return,
     };
 
-    let client = match get_client(&account, &token).await {
+    let client = match connect(result_tx, &account, &token).await {
         Ok(c) => c,
         Err(e) => {
             let _ = result_tx
@@ -464,7 +492,7 @@ async fn handle_repost(result_tx: &mpsc::Sender<AsyncResult>, post: Post, accoun
         _ => return,
     };
 
-    let client = match get_client(&account, &token).await {
+    let client = match connect(result_tx, &account, &token).await {
         Ok(c) => c,
         Err(e) => {
             let _ = result_tx
@@ -500,7 +528,7 @@ async fn handle_unrepost(result_tx: &mpsc::Sender<AsyncResult>, post: Post, acco
         _ => return,
     };
 
-    let client = match get_client(&account, &token).await {
+    let client = match connect(result_tx, &account, &token).await {
         Ok(c) => c,
         Err(e) => {
             let _ = result_tx
@@ -567,7 +595,7 @@ async fn handle_post(
             }
         };
 
-        let client = match get_client(account, &token).await {
+        let client = match connect(result_tx, account, &token).await {
             Ok(c) => c,
             Err(e) => {
                 errors.push(format!("{}: {}", account.network.name(), e));

@@ -362,6 +362,35 @@ impl Database {
         Ok(())
     }
 
+    /// Record `did` for an account that has none stored yet. Never overwrites
+    /// an existing DID. Returns whether the row was updated.
+    pub fn set_account_did_if_missing(&self, id: Uuid, did: &str) -> Result<bool> {
+        let changed = self.conn.execute(
+            "UPDATE accounts SET did = ?2 WHERE id = ?1 AND did IS NULL",
+            params![id.to_string(), did],
+        )?;
+        Ok(changed > 0)
+    }
+
+    /// Backfill the DID of an older Bluesky account from a session it just
+    /// created. A different stored DID is left alone and logged. Errors are
+    /// logged rather than returned: this is best effort and must not fail the
+    /// caller's actual operation.
+    pub fn backfill_account_did(&self, account: &Account, session_did: &str) {
+        match account.did.as_deref() {
+            Some(stored) if stored == session_did => {}
+            Some(stored) => tracing::warn!(
+                "Session DID {session_did} for @{} differs from stored DID {stored}; keeping the stored one",
+                account.handle
+            ),
+            None => {
+                if let Err(e) = self.set_account_did_if_missing(account.id, session_did) {
+                    tracing::warn!("Failed to record DID for @{}: {e}", account.handle);
+                }
+            }
+        }
+    }
+
     /// Set an account as the default for its network
     pub fn set_default_account(&self, id: Uuid, network: Network) -> Result<()> {
         // Unset the current default for this network only; each network keeps
@@ -807,6 +836,45 @@ mod tests {
         other.did = Some("did:plc:xyz".to_string());
         assert_eq!(db.upsert_account(&other).unwrap().id, other.id);
         assert_eq!(db.get_accounts().unwrap().len(), 2);
+    }
+
+    /// The session DID is recorded for a legacy row without one, but an
+    /// existing (different) DID is never overwritten.
+    #[test]
+    fn test_set_account_did_if_missing_does_not_overwrite() {
+        let dir = tempdir().unwrap();
+        let db = Database::open_path(&dir.path().join("test.sqlite")).unwrap();
+        let did_of = |db: &Database, id: Uuid| {
+            db.get_accounts()
+                .unwrap()
+                .into_iter()
+                .find(|a| a.id == id)
+                .unwrap()
+                .did
+        };
+
+        let legacy = Account::new_bluesky("me.bsky.social", "Me");
+        db.insert_account(&legacy).unwrap();
+        assert!(
+            db.set_account_did_if_missing(legacy.id, "did:plc:abc")
+                .unwrap()
+        );
+        assert!(
+            !db.set_account_did_if_missing(legacy.id, "did:plc:xyz")
+                .unwrap()
+        );
+        assert_eq!(did_of(&db, legacy.id).as_deref(), Some("did:plc:abc"));
+
+        // backfill_account_did: fills a missing DID, keeps a different stored one
+        let other = Account::new_bluesky("other.bsky.social", "Other");
+        db.insert_account(&other).unwrap();
+        db.backfill_account_did(&other, "did:plc:other");
+        assert_eq!(did_of(&db, other.id).as_deref(), Some("did:plc:other"));
+
+        let mut stale = other.clone();
+        stale.did = Some("did:plc:other".to_string());
+        db.backfill_account_did(&stale, "did:plc:changed");
+        assert_eq!(did_of(&db, other.id).as_deref(), Some("did:plc:other"));
     }
 
     /// Regression for #37: setting a default on one network must not clear

@@ -310,6 +310,13 @@ fn handle_async_result(state: &mut AppState, result: AsyncResult) -> Option<Asyn
             state.set_status(message);
             None
         }
+        AsyncResult::SessionDid { account_id, did } => {
+            if let Some(account) = state.accounts.iter_mut().find(|a| a.id == account_id) {
+                state.db.backfill_account_did(account, &did);
+                account.did.get_or_insert(did);
+            }
+            None
+        }
         AsyncResult::ImageLoaded { url, image } => {
             state.loading_images.remove(&url);
             state.image_cache.insert(&url, image);

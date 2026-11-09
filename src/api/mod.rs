@@ -58,6 +58,14 @@ impl Client {
         }
     }
 
+    /// The account DID of a Bluesky session (`None` for Mastodon)
+    pub fn session_did(&self) -> Option<&str> {
+        match self {
+            Self::Mastodon(_) => None,
+            Self::Bluesky(c) => Some(c.did()),
+        }
+    }
+
     /// Get recent public posts with a hashtag (`tag` without the leading `#`)
     pub async fn hashtag_timeline(&self, tag: &str, limit: usize) -> Result<Vec<Post>> {
         match self {
