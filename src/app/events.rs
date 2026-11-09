@@ -27,6 +27,26 @@ pub fn process_pending_update(state: &mut AppState) {
     state.mode = Mode::Normal;
 }
 
+/// Handle text pasted into the terminal (bracketed paste).
+///
+/// Without bracketed paste, terminals and multiplexers replay pasted text as
+/// key presses, and line breaks can arrive as escape sequences (for example
+/// `ESC E`) that end up in the compose text as stray characters.
+pub fn handle_paste(state: &mut AppState, text: &str) {
+    let text = text.replace("\r\n", "\n").replace('\r', "\n");
+    match state.mode {
+        Mode::Compose if state.compose_schedule_focused => {
+            state
+                .compose_schedule_input
+                .push_str(&text.replace('\n', " "));
+            let _ = state.apply_schedule_input();
+        }
+        Mode::Compose => state.compose_text.push_str(&text),
+        Mode::Search => state.search_query.push_str(&text.replace('\n', " ")),
+        _ => {}
+    }
+}
+
 /// Handle key events, returning an optional async command
 pub fn handle_key(state: &mut AppState, key: KeyEvent) -> Option<AsyncCommand> {
     // Handle mode-specific input first
@@ -103,8 +123,9 @@ pub fn handle_key(state: &mut AppState, key: KeyEvent) -> Option<AsyncCommand> {
             state.mode = Mode::About;
             return None;
         }
-        // Update (when available)
-        (_, KeyCode::Char('u' | 'U')) => {
+        // Update (when available). Plain/Shift only, so Ctrl+u reaches the
+        // detail-panel scroll handler.
+        (KeyModifiers::NONE | KeyModifiers::SHIFT, KeyCode::Char('u' | 'U')) => {
             if state.update_available.is_some() {
                 state.mode = Mode::UpdateConfirm;
             }
@@ -503,13 +524,11 @@ fn handle_compose_key(state: &mut AppState, key: KeyEvent) -> Option<AsyncComman
                     let content = state.compose_text.clone();
                     let reply_to = state.reply_to.clone();
                     let schedule = state.compose_schedule;
-                    // Find accounts matching selected networks
-                    let accounts: Vec<_> = state
-                        .accounts
-                        .iter()
-                        .filter(|a| state.compose_networks.contains(&a.network))
-                        .cloned()
-                        .collect();
+                    // One account per selected network (default, else newest)
+                    let accounts = crate::models::Account::default_for_networks(
+                        &state.accounts,
+                        &state.compose_networks,
+                    );
 
                     if accounts.is_empty() {
                         state.set_status("⚠ No accounts for selected networks");
@@ -685,11 +704,9 @@ fn handle_about_key(state: &mut AppState, key: KeyEvent) {
             // Open GitHub repository
             let _ = open::that("https://github.com/ricardodantas/perch");
         }
-        KeyCode::Char('u' | 'U') => {
+        KeyCode::Char('u' | 'U') if state.update_available.is_some() => {
             // Trigger update if available
-            if state.update_available.is_some() {
-                state.mode = Mode::UpdateConfirm;
-            }
+            state.mode = Mode::UpdateConfirm;
         }
         _ => {}
     }
@@ -720,4 +737,32 @@ fn find_account_for_post(
         .iter()
         .find(|a| a.network == post.network)
         .cloned()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::Config;
+    use crate::db::Database;
+
+    fn test_state(dir: &tempfile::TempDir) -> AppState {
+        let db = Database::open_path(&dir.path().join("test.sqlite")).unwrap();
+        AppState::new(Config::default(), db).unwrap()
+    }
+
+    #[test]
+    fn ctrl_u_scrolls_detail_panel_up_even_when_update_available() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut state = test_state(&dir);
+        state.focused_panel = FocusedPanel::Detail;
+        state.detail_scroll = 20;
+        state.update_available = Some("9.9.9".to_string());
+
+        handle_key(
+            &mut state,
+            KeyEvent::new(KeyCode::Char('u'), KeyModifiers::CONTROL),
+        );
+
+        assert_eq!((state.detail_scroll, state.mode), (10, Mode::Normal));
+    }
 }

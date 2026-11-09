@@ -78,6 +78,7 @@ async fn loader_task(
 ) {
     // Create a reqwest client for downloading images
     let client = reqwest::Client::builder()
+        .user_agent(format!("Perch/{}", env!("CARGO_PKG_VERSION")))
         .timeout(std::time::Duration::from_secs(30))
         .build()
         .unwrap_or_default();

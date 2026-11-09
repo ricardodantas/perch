@@ -95,4 +95,58 @@ impl Account {
     pub fn keyring_key(&self) -> String {
         format!("perch:{}:{}", self.network.name().to_lowercase(), self.id)
     }
+
+    /// Pick one account per network (in `networks` order, duplicates ignored):
+    /// the explicit default if any, otherwise the most recently added account.
+    ///
+    /// Mirrors `Database::get_default_account`, so a network is never posted to
+    /// more than once even if several accounts exist for it.
+    pub fn default_for_networks(accounts: &[Self], networks: &[Network]) -> Vec<Self> {
+        let mut selected: Vec<Self> = Vec::new();
+        for network in networks {
+            if selected.iter().any(|a| a.network == *network) {
+                continue;
+            }
+            if let Some(account) = accounts
+                .iter()
+                .filter(|a| a.network == *network)
+                .max_by_key(|a| (a.is_default, a.created_at))
+            {
+                selected.push(account.clone());
+            }
+        }
+        selected
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_default_for_networks_picks_one_account_per_network() {
+        let mut old_bsky = Account::new_bluesky("me.bsky.social", "Me");
+        old_bsky.created_at -= chrono::Duration::hours(1);
+        let new_bsky = Account::new_bluesky("me.bsky.social", "Me");
+        let mut masto_default = Account::new_mastodon("me", "https://a.example", "Me");
+        masto_default.is_default = true;
+        masto_default.created_at -= chrono::Duration::hours(1);
+        let masto_newer = Account::new_mastodon("alt", "https://b.example", "Alt");
+        let accounts = vec![
+            old_bsky,
+            new_bsky.clone(),
+            masto_default.clone(),
+            masto_newer,
+        ];
+
+        let picked = Account::default_for_networks(
+            &accounts,
+            &[Network::Bluesky, Network::Mastodon, Network::Bluesky],
+        );
+        let ids: Vec<_> = picked.iter().map(|a| a.id).collect();
+        assert_eq!(ids, vec![new_bsky.id, masto_default.id]);
+
+        let picked = Account::default_for_networks(&accounts[..2], &[Network::Mastodon]);
+        assert!(picked.is_empty());
+    }
 }

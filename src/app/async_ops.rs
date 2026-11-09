@@ -205,7 +205,7 @@ async fn handle_refresh(result_tx: &mpsc::Sender<AsyncResult>, accounts: Vec<Acc
     }
 
     // Sort by timestamp (newest first)
-    all_posts.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+    all_posts.sort_by_key(|p| std::cmp::Reverse(p.created_at));
 
     if all_posts.is_empty() && !errors.is_empty() {
         let _ = result_tx
@@ -673,8 +673,12 @@ async fn handle_schedule_post(
 async fn handle_load_image(result_tx: &mpsc::Sender<AsyncResult>, url: String) {
     log_debug(&format!("Loading image: {}", url));
 
-    // Download the image
-    let response = match reqwest::get(&url).await {
+    // Download the image. GoToSocial rejects requests without a User-Agent (HTTP 418).
+    let client = reqwest::Client::builder()
+        .user_agent(format!("Perch/{}", env!("CARGO_PKG_VERSION")))
+        .build()
+        .unwrap_or_default();
+    let response = match client.get(&url).send().await {
         Ok(resp) => resp,
         Err(e) => {
             log_debug(&format!("Failed to fetch image: {}", e));
