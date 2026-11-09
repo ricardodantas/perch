@@ -670,15 +670,26 @@ async fn handle_schedule_post(
 }
 
 /// Handle image loading from URL
+/// HTTP client for image downloads, built once so connections are reused.
+///
+/// The 30s timeout matches `images::loader`; a timeout surfaces as a normal
+/// `ImageFailed` result.
+fn image_client() -> &'static reqwest::Client {
+    static CLIENT: std::sync::OnceLock<reqwest::Client> = std::sync::OnceLock::new();
+    CLIENT.get_or_init(|| {
+        reqwest::Client::builder()
+            // GoToSocial rejects requests without a User-Agent (HTTP 418)
+            .user_agent(format!("Perch/{}", env!("CARGO_PKG_VERSION")))
+            .timeout(std::time::Duration::from_secs(30))
+            .build()
+            .unwrap_or_default()
+    })
+}
+
 async fn handle_load_image(result_tx: &mpsc::Sender<AsyncResult>, url: String) {
     log_debug(&format!("Loading image: {}", url));
 
-    // Download the image. GoToSocial rejects requests without a User-Agent (HTTP 418).
-    let client = reqwest::Client::builder()
-        .user_agent(format!("Perch/{}", env!("CARGO_PKG_VERSION")))
-        .build()
-        .unwrap_or_default();
-    let response = match client.get(&url).send().await {
+    let response = match image_client().get(&url).send().await {
         Ok(resp) => resp,
         Err(e) => {
             log_debug(&format!("Failed to fetch image: {}", e));
