@@ -38,10 +38,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Copy assets from root
-        run: |
-          cp -r ../screenshots public/
-
+      # `prebuild` copies ../screenshots into public/screenshots
       - name: Build
         run: npm run build
 
