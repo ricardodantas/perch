@@ -672,11 +672,9 @@ fn handle_about_key(state: &mut AppState, key: KeyEvent) {
             // Open GitHub repository
             let _ = open::that("https://github.com/ricardodantas/perch");
         }
-        KeyCode::Char('u' | 'U') => {
+        KeyCode::Char('u' | 'U') if state.update_available.is_some() => {
             // Trigger update if available
-            if state.update_available.is_some() {
-                state.mode = Mode::UpdateConfirm;
-            }
+            state.mode = Mode::UpdateConfirm;
         }
         _ => {}
     }

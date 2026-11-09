@@ -198,7 +198,7 @@ async fn handle_refresh(result_tx: &mpsc::Sender<AsyncResult>, accounts: Vec<Acc
     }
 
     // Sort by timestamp (newest first)
-    all_posts.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+    all_posts.sort_by_key(|p| std::cmp::Reverse(p.created_at));
 
     if all_posts.is_empty() && !errors.is_empty() {
         let _ = result_tx
