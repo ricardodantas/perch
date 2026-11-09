@@ -617,8 +617,12 @@ async fn handle_schedule_post(
 async fn handle_load_image(result_tx: &mpsc::Sender<AsyncResult>, url: String) {
     log_debug(&format!("Loading image: {}", url));
 
-    // Download the image
-    let response = match reqwest::get(&url).await {
+    // Download the image. GoToSocial rejects requests without a User-Agent (HTTP 418).
+    let client = reqwest::Client::builder()
+        .user_agent(format!("Perch/{}", env!("CARGO_PKG_VERSION")))
+        .build()
+        .unwrap_or_default();
+    let response = match client.get(&url).send().await {
         Ok(resp) => resp,
         Err(e) => {
             log_debug(&format!("Failed to fetch image: {}", e));
