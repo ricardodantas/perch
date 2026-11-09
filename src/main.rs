@@ -256,16 +256,17 @@ KEYBINDINGS (TUI):
     Navigation
       j/↓           Move down
       k/↑           Move up
-      Tab           Switch panel
+      h/l, ←/→      Switch panel
+      Tab           Switch view (Timeline/Accounts)
       g/G           Jump to top/bottom
 
     Actions
       n             New post (compose)
       /             Search
-      r             Refresh
+      b             Refresh
       o             Open in browser
-      l             Like/favorite
-      b             Boost/repost
+      L             Like/favorite
+      r             Boost/repost
 
     View
       f             Cycle filter (All/Mastodon/Bluesky)

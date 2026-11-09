@@ -326,7 +326,7 @@ perch accounts remove <account-id>
 
 | Key | Action |
 |-----|--------|
-| `Tab` | Switch panel |
+| `Tab` | Switch view (Timeline/Accounts) |
 | `?` / `F1` | Show help |
 | `t` | Change theme |
 | `q` | Quit |
@@ -338,21 +338,21 @@ perch accounts remove <account-id>
 |-----|--------|
 | `↑` / `k` | Move up |
 | `↓` / `j` | Move down |
-| `g` / `Home` | Go to first item |
-| `G` / `End` | Go to last item |
-| `PageUp` | Page up |
-| `PageDown` | Page down |
+| `←` / `h`, `→` / `l` | Switch panel |
+| `g` | Go to first item |
+| `G` | Go to last item |
+| `Ctrl+d` / `Ctrl+u` | Page down/up (detail panel) |
 
 ### Timeline View
 
 | Key | Action |
 |-----|--------|
-| `r` | Refresh timeline |
+| `b` | Refresh timeline |
 | `f` | Cycle filter (All/Mastodon/Bluesky) |
 | `Enter` | View post details |
 | `o` | Open in browser |
-| `l` | Like/favorite |
-| `b` | Boost/repost |
+| `L` | Like/favorite |
+| `r` | Boost/repost |
 | `R` | Reply to post |
 
 ### Compose
@@ -360,9 +360,9 @@ perch accounts remove <account-id>
 | Key | Action |
 |-----|--------|
 | `n` | New post |
-| `Ctrl+Enter` | Send post |
-| `Alt+1` | Toggle Mastodon |
-| `Alt+2` | Toggle Bluesky |
+| `Ctrl+s` | Send post |
+| `F1` | Toggle Mastodon |
+| `F2` | Toggle Bluesky |
 | `Esc` | Cancel |
 
 <br>
@@ -371,7 +371,7 @@ perch accounts remove <account-id>
 
 Perch includes **15 beautiful themes** based on popular terminal and editor color schemes.
 
-Press `t` in the TUI to cycle through themes.
+Press `t` in the TUI to open the theme picker.
 
 ### Available Themes
 
