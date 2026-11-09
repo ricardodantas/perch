@@ -124,17 +124,33 @@ impl Database {
     /// versions. Never drops or rewrites existing data.
     fn migrate(&self) -> Result<()> {
         // accounts.did (stable Bluesky account id), added after the first release
-        let has_did: bool = self.conn.query_row(
-            "SELECT COUNT(*) > 0 FROM pragma_table_info('accounts') WHERE name = 'did'",
-            [],
-            |row| row.get(0),
-        )?;
-        if !has_did {
-            self.conn
-                .execute("ALTER TABLE accounts ADD COLUMN did TEXT", [])?;
+        if !self.has_did_column()? {
+            self.add_did_column()?;
         }
 
         Ok(())
+    }
+
+    fn has_did_column(&self) -> Result<bool> {
+        Ok(self.conn.query_row(
+            "SELECT COUNT(*) > 0 FROM pragma_table_info('accounts') WHERE name = 'did'",
+            [],
+            |row| row.get(0),
+        )?)
+    }
+
+    /// Add `accounts.did`. If the ALTER fails because another process (e.g. the
+    /// scheduler daemon and the TUI starting together) added the column after
+    /// our check, that's success, not an error.
+    fn add_did_column(&self) -> Result<()> {
+        match self
+            .conn
+            .execute("ALTER TABLE accounts ADD COLUMN did TEXT", [])
+        {
+            Ok(_) => Ok(()),
+            Err(_) if self.has_did_column()? => Ok(()),
+            Err(e) => Err(e).context("Failed to add accounts.did column"),
+        }
     }
 
     // ==================== Accounts ====================
@@ -732,6 +748,19 @@ mod tests {
         // Idempotent
         let db = Database::open_path(&path).unwrap();
         assert_eq!(db.get_accounts().unwrap().len(), 1);
+    }
+
+    /// Two processes opening an old database at once both see `did` missing;
+    /// the one whose ALTER loses the race must still open successfully.
+    #[test]
+    fn test_add_did_column_tolerates_column_added_concurrently() {
+        let dir = tempdir().unwrap();
+        // Already migrated (as if another process just added the column)
+        let db = Database::open_path(&dir.path().join("test.sqlite")).unwrap();
+
+        db.add_did_column().unwrap();
+
+        assert!(db.has_did_column().unwrap());
     }
 
     /// Re-auth after a Bluesky handle change updates the same row via its DID.
