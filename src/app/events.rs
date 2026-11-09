@@ -123,8 +123,9 @@ pub fn handle_key(state: &mut AppState, key: KeyEvent) -> Option<AsyncCommand> {
             state.mode = Mode::About;
             return None;
         }
-        // Update (when available)
-        (_, KeyCode::Char('u' | 'U')) => {
+        // Update (when available). Plain/Shift only, so Ctrl+u reaches the
+        // detail-panel scroll handler.
+        (KeyModifiers::NONE | KeyModifiers::SHIFT, KeyCode::Char('u' | 'U')) => {
             if state.update_available.is_some() {
                 state.mode = Mode::UpdateConfirm;
             }
@@ -723,4 +724,32 @@ fn find_account_for_post(
         .iter()
         .find(|a| a.network == post.network)
         .cloned()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::Config;
+    use crate::db::Database;
+
+    fn test_state(dir: &tempfile::TempDir) -> AppState {
+        let db = Database::open_path(&dir.path().join("test.sqlite")).unwrap();
+        AppState::new(Config::default(), db).unwrap()
+    }
+
+    #[test]
+    fn ctrl_u_scrolls_detail_panel_up_even_when_update_available() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut state = test_state(&dir);
+        state.focused_panel = FocusedPanel::Detail;
+        state.detail_scroll = 20;
+        state.update_available = Some("9.9.9".to_string());
+
+        handle_key(
+            &mut state,
+            KeyEvent::new(KeyCode::Char('u'), KeyModifiers::CONTROL),
+        );
+
+        assert_eq!((state.detail_scroll, state.mode), (10, Mode::Normal));
+    }
 }

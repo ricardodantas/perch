@@ -182,7 +182,7 @@ fn render_timeline_view(frame: &mut Frame, state: &mut AppState, area: Rect) {
             ListItem::new(Line::from("")),
             ListItem::new(Line::from(vec![
                 Span::styled("  Press ", colors.text_dim()),
-                Span::styled("[r]", colors.key_hint()),
+                Span::styled("[b]", colors.key_hint()),
                 Span::styled(" to refresh", colors.text_dim()),
             ])),
         ]
@@ -678,8 +678,6 @@ fn render_accounts_view(frame: &mut Frame, state: &AppState, area: Rect) {
         Span::styled(" Set default  ", colors.text_muted()),
         Span::styled("[D]", colors.key_hint()),
         Span::styled(" Delete  ", colors.text_muted()),
-        Span::styled("[r]", colors.key_hint()),
-        Span::styled(" Refresh token  ", colors.text_muted()),
         Span::styled("[Enter]", colors.key_hint()),
         Span::styled(" View timeline", colors.text_muted()),
     ]);
