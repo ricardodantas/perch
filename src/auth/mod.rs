@@ -48,10 +48,10 @@ fn get_machine_id() -> String {
         {
             let stdout = String::from_utf8_lossy(&output.stdout);
             for line in stdout.lines() {
-                if line.contains("IOPlatformUUID") {
-                    if let Some(uuid) = line.split('"').nth(3) {
-                        return uuid.to_string();
-                    }
+                if line.contains("IOPlatformUUID")
+                    && let Some(uuid) = line.split('"').nth(3)
+                {
+                    return uuid.to_string();
                 }
             }
         }
@@ -71,10 +71,10 @@ fn get_machine_id() -> String {
         {
             let stdout = String::from_utf8_lossy(&output.stdout);
             for line in stdout.lines() {
-                if line.contains("MachineGuid") {
-                    if let Some(guid) = line.split_whitespace().last() {
-                        return guid.to_string();
-                    }
+                if line.contains("MachineGuid")
+                    && let Some(guid) = line.split_whitespace().last()
+                {
+                    return guid.to_string();
                 }
             }
         }
@@ -224,9 +224,7 @@ pub fn get_oauth_client(instance: &str) -> Result<Option<(String, String)>> {
 
 /// Check if credentials exist for an account
 pub fn has_credentials(account: &Account) -> bool {
-    get_credentials(account)
-        .map(|c| c.is_some())
-        .unwrap_or(false)
+    get_credentials(account).is_ok_and(|c| c.is_some())
 }
 
 /// Get all stored credential keys (for debugging)

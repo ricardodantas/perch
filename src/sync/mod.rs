@@ -40,7 +40,7 @@ impl SyncManager {
         }
 
         // Sort by timestamp (newest first)
-        all_posts.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+        all_posts.sort_by_key(|p| std::cmp::Reverse(p.created_at));
 
         // Cache posts
         {
