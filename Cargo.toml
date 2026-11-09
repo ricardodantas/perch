@@ -71,6 +71,11 @@ ratatui-image = { version = "10", default-features = false, features = ["crosste
 image = "0.25"
 ctrlc = { version = "3.5.1", features = ["termination"] }
 
+[target.'cfg(unix)'.dependencies]
+# Poll stdin with a timeout when probing the terminal (images::init_picker).
+# Already in the tree via crossterm; this only adds the `event` feature.
+rustix = { version = "1.1", default-features = false, features = ["std", "stdio", "event"] }
+
 [dev-dependencies]
 tokio-test = "0.4"
 tempfile = "3.24"
