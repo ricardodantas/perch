@@ -206,12 +206,17 @@ impl Database {
         accounts.collect::<Result<Vec<_>, _>>().map_err(Into::into)
     }
 
-    /// Get the default account for a network
+    /// Get the default account for a network.
+    ///
+    /// Prefers the account explicitly marked as default; otherwise falls back to
+    /// the most recently added account for that network (`perch auth` does not
+    /// mark accounts as default).
     pub fn get_default_account(&self, network: Network) -> Result<Option<Account>> {
         let network_str = format!("{network:?}").to_lowercase();
         let mut stmt = self.conn.prepare(
             "SELECT id, network, display_name, handle, server, is_default, avatar_url, created_at, last_used_at 
-             FROM accounts WHERE network = ?1 AND is_default = 1"
+             FROM accounts WHERE network = ?1
+             ORDER BY is_default DESC, created_at DESC LIMIT 1"
         )?;
 
         let result = stmt.query_row(params![network_str], |row| {
@@ -253,10 +258,14 @@ impl Database {
     }
 
     /// Set an account as the default for its network
-    pub fn set_default_account(&self, id: Uuid, _network: Network) -> Result<()> {
-        // Unset ALL current defaults (only one default across all networks)
-        self.conn
-            .execute("UPDATE accounts SET is_default = 0", params![])?;
+    pub fn set_default_account(&self, id: Uuid, network: Network) -> Result<()> {
+        // Unset the current default for this network only; each network keeps
+        // its own default so `perch post` can resolve an account for every network.
+        let network_str = format!("{network:?}").to_lowercase();
+        self.conn.execute(
+            "UPDATE accounts SET is_default = 0 WHERE network = ?1",
+            params![network_str],
+        )?;
 
         // Set new default
         self.conn.execute(
@@ -541,5 +550,53 @@ mod tests {
         db.delete_account(accounts[0].id).unwrap();
         let accounts = db.get_accounts().unwrap();
         assert!(accounts.is_empty());
+    }
+
+    /// Regression for #37: `perch auth bluesky` stores accounts with
+    /// `is_default = false`, so `perch post` must still find them.
+    #[test]
+    fn test_default_account_falls_back_to_newest_for_network() {
+        let dir = tempdir().unwrap();
+        let db = Database::open_path(&dir.path().join("test.sqlite")).unwrap();
+
+        let mastodon = Account::new_mastodon("me", "https://mastodon.social", "Me");
+        db.insert_account(&mastodon).unwrap();
+        let mut old_bsky = Account::new_bluesky("me.bsky.social", "Me");
+        old_bsky.created_at -= chrono::Duration::hours(1);
+        db.insert_account(&old_bsky).unwrap();
+        // Re-running `perch auth bluesky` adds another row
+        let new_bsky = Account::new_bluesky("me.bsky.social", "Me");
+        db.insert_account(&new_bsky).unwrap();
+
+        let found = db.get_default_account(Network::Bluesky).unwrap();
+        assert_eq!(found.map(|a| a.id), Some(new_bsky.id));
+        let found = db.get_default_account(Network::Mastodon).unwrap();
+        assert_eq!(found.map(|a| a.id), Some(mastodon.id));
+    }
+
+    /// Regression for #37: setting a default on one network must not clear
+    /// the default chosen for another network.
+    #[test]
+    fn test_set_default_account_is_per_network() {
+        let dir = tempdir().unwrap();
+        let db = Database::open_path(&dir.path().join("test.sqlite")).unwrap();
+
+        let mastodon = Account::new_mastodon("me", "https://mastodon.social", "Me");
+        db.insert_account(&mastodon).unwrap();
+        let bsky_a = Account::new_bluesky("a.bsky.social", "A");
+        db.insert_account(&bsky_a).unwrap();
+        let mut bsky_b = Account::new_bluesky("b.bsky.social", "B");
+        bsky_b.created_at += chrono::Duration::hours(1);
+        db.insert_account(&bsky_b).unwrap();
+
+        // Explicitly pick the older Bluesky account, then set Mastodon default
+        db.set_default_account(bsky_a.id, Network::Bluesky).unwrap();
+        db.set_default_account(mastodon.id, Network::Mastodon)
+            .unwrap();
+
+        let found = db.get_default_account(Network::Bluesky).unwrap();
+        assert_eq!(found.map(|a| a.id), Some(bsky_a.id));
+        let found = db.get_default_account(Network::Mastodon).unwrap();
+        assert_eq!(found.map(|a| a.id), Some(mastodon.id));
     }
 }
