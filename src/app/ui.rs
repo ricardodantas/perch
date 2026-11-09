@@ -228,7 +228,8 @@ fn render_timeline_view(frame: &mut Frame, state: &mut AppState, area: Rect) {
                 ];
 
                 // Show full content, wrapping lines to fit width
-                let content_width = width.saturating_sub(4); // 3 spaces indent + margin
+                // 3 spaces indent + margin; at least 1 so `chunks` never gets 0 in narrow panels
+                let content_width = width.saturating_sub(4).max(1);
                 for line in post.content.lines() {
                     // Wrap long lines
                     let chars: Vec<char> = line.chars().collect();
@@ -1333,9 +1334,12 @@ fn render_compose_popup(frame: &mut Frame, state: &AppState) {
         // Cursor in schedule input field
         let schedule_prefix = "  📅 Schedule: ".len() as u16;
         let input_len = state.compose_schedule_input.len() as u16;
-        let cursor_x = popup_area.x + schedule_prefix + input_len;
+        let cursor_x = popup_area
+            .x
+            .saturating_add(schedule_prefix)
+            .saturating_add(input_len);
         let cursor_y = popup_area.y + 2 + reply_offset + 1; // After network row
-        if cursor_x < popup_area.x + popup_area.width - 1 {
+        if cursor_x < (popup_area.x + popup_area.width).saturating_sub(1) {
             frame.set_cursor_position((cursor_x, cursor_y));
         }
     } else {
@@ -1344,14 +1348,17 @@ fn render_compose_popup(frame: &mut Frame, state: &AppState) {
         let line_count = text_lines.len();
         let last_line_len = text_lines.last().map_or(0, |l| l.len());
 
-        let cursor_x = popup_area.x + 3 + last_line_len as u16;
+        let cursor_x = popup_area
+            .x
+            .saturating_add(3)
+            .saturating_add(u16::try_from(last_line_len).unwrap_or(u16::MAX));
         let cursor_y = popup_area.y
             + 2
             + reply_offset
             + network_offset
             + (line_count.saturating_sub(1)) as u16;
-        if cursor_x < popup_area.x + popup_area.width - 1
-            && cursor_y < popup_area.y + popup_area.height - 2
+        if cursor_x < (popup_area.x + popup_area.width).saturating_sub(1)
+            && cursor_y < (popup_area.y + popup_area.height).saturating_sub(2)
         {
             frame.set_cursor_position((cursor_x, cursor_y));
         }
@@ -1407,8 +1414,9 @@ fn render_search_popup(frame: &mut Frame, state: &AppState) {
 
 /// Helper function to create a centered rect
 const fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
-    let popup_width = r.width * percent_x / 100;
-    let popup_height = r.height * percent_y / 100;
+    // u32 math: `width * percent` overflows u16 on very wide terminals (> 655 cols at 100%)
+    let popup_width = (r.width as u32 * percent_x as u32 / 100) as u16;
+    let popup_height = (r.height as u32 * percent_y as u32 / 100) as u16;
     Rect {
         x: r.x + (r.width.saturating_sub(popup_width)) / 2,
         y: r.y + (r.height.saturating_sub(popup_height)) / 2,
@@ -1610,5 +1618,77 @@ fn render_update_status(frame: &mut Frame, state: &AppState) {
             );
 
         frame.render_widget(paragraph, banner_area);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::Config;
+    use crate::db::Database;
+    use ratatui::{Terminal, backend::TestBackend};
+
+    const ALL_MODES: [Mode; 8] = [
+        Mode::Normal,
+        Mode::Compose,
+        Mode::Search,
+        Mode::Help,
+        Mode::ThemePicker,
+        Mode::About,
+        Mode::UpdateConfirm,
+        Mode::Updating,
+    ];
+
+    fn demo_state(dir: &tempfile::TempDir) -> AppState {
+        let db = Database::open_path(&dir.path().join("test.sqlite")).unwrap();
+        let mut state = AppState::new(Config::default(), db).unwrap();
+        state.accounts = crate::demo::demo_accounts();
+        state.posts = crate::demo::demo_posts();
+        state.update_available = Some("9.9.9".to_string());
+        state.compose_text = "hello\nworld".to_string();
+        state.search_query = "#rust".to_string();
+        state
+    }
+
+    fn draw(state: &mut AppState, width: u16, height: u16) {
+        let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
+        terminal.draw(|frame| render(frame, state)).unwrap();
+    }
+
+    #[test]
+    fn timeline_renders_in_narrow_terminals_without_panicking() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut state = demo_state(&dir);
+        for width in 0..=24 {
+            draw(&mut state, width, 30);
+        }
+    }
+
+    #[test]
+    fn every_mode_renders_in_tiny_terminals_without_panicking() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut state = demo_state(&dir);
+        for view in [View::Timeline, View::Accounts] {
+            for mode in ALL_MODES {
+                for (width, height) in [(0, 0), (1, 1), (3, 2), (4, 3), (6, 4), (10, 5), (20, 8)] {
+                    state.view = view;
+                    state.mode = mode;
+                    state.compose_schedule_focused = false;
+                    draw(&mut state, width, height);
+                    state.compose_schedule_focused = true;
+                    draw(&mut state, width, height);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn popups_render_in_very_wide_terminals_without_panicking() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut state = demo_state(&dir);
+        for mode in ALL_MODES {
+            state.mode = mode;
+            draw(&mut state, 1000, 40);
+        }
     }
 }
