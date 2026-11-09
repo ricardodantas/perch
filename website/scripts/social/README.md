@@ -11,3 +11,10 @@ which writes `public/og-image.png` and `public/apple-touch-icon.png`.
   the machine's emoji font.
 
 The card also crops `../../screenshots/01-timeline.png` from the repository root.
+
+Text is set in the site's fonts, Inter (500/700/800) and JetBrains Mono (400),
+from the `@fontsource/inter` and `@fontsource/jetbrains-mono` devDependencies
+(SIL Open Font License 1.1). `fontkit` shapes each string (kerning included)
+and the glyph outlines are inlined as SVG paths, so the result doesn't depend
+on the fonts installed on the machine. These packages are only used by this
+script, never by the site build.
