@@ -96,23 +96,30 @@ impl Account {
         format!("perch:{}:{}", self.network.name().to_lowercase(), self.id)
     }
 
-    /// Pick one account per network (in `networks` order, duplicates ignored):
-    /// the explicit default if any, otherwise the most recently added account.
+    /// The account to act with on `network`: the explicit default if any,
+    /// otherwise the most recently added account for that network.
     ///
-    /// Mirrors `Database::get_default_account`, so a network is never posted to
-    /// more than once even if several accounts exist for it.
+    /// Mirrors `Database::get_default_account`. Every "which account for this
+    /// network" decision should go through this.
+    pub fn default_for_network(accounts: &[Self], network: Network) -> Option<Self> {
+        accounts
+            .iter()
+            .filter(|a| a.network == network)
+            .max_by_key(|a| (a.is_default, a.created_at))
+            .cloned()
+    }
+
+    /// Pick one account per network (in `networks` order, duplicates ignored)
+    /// using [`Self::default_for_network`], so a network is never posted to or
+    /// fetched more than once even if several accounts exist for it.
     pub fn default_for_networks(accounts: &[Self], networks: &[Network]) -> Vec<Self> {
         let mut selected: Vec<Self> = Vec::new();
         for network in networks {
             if selected.iter().any(|a| a.network == *network) {
                 continue;
             }
-            if let Some(account) = accounts
-                .iter()
-                .filter(|a| a.network == *network)
-                .max_by_key(|a| (a.is_default, a.created_at))
-            {
-                selected.push(account.clone());
+            if let Some(account) = Self::default_for_network(accounts, *network) {
+                selected.push(account);
             }
         }
         selected
@@ -148,5 +155,10 @@ mod tests {
 
         let picked = Account::default_for_networks(&accounts[..2], &[Network::Mastodon]);
         assert!(picked.is_empty());
+
+        let picked = Account::default_for_network(&accounts, Network::Mastodon);
+        assert_eq!(picked.map(|a| a.id), Some(masto_default.id));
+        let picked = Account::default_for_network(&accounts, Network::Bluesky);
+        assert_eq!(picked.map(|a| a.id), Some(new_bsky.id));
     }
 }

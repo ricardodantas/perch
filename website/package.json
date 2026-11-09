@@ -11,7 +11,8 @@
     "prebuild": "npm run sync-screenshots",
     "build": "astro build",
     "preview": "astro preview",
-    "astro": "astro"
+    "astro": "astro",
+    "generate:social-images": "node scripts/generate-social-images.mjs"
   },
   "dependencies": {
     "astro": "^7.3.3"
