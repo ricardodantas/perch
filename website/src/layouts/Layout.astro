@@ -1,4 +1,6 @@
 ---
+import { Font } from 'astro:assets';
+
 interface Props {
   title: string;
   description?: string;
@@ -103,8 +105,8 @@ const jsonLd = {
 
     <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
 
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <Font cssVariable="--font-inter" preload />
+    <Font cssVariable="--font-jetbrains-mono" />
   </head>
   <body>
     <a href="#main-content" class="skip-link">Skip to main content</a>
@@ -169,8 +171,9 @@ const jsonLd = {
     --accent-red: #ff5555;
     --accent-yellow: #f1fa8c;
 
-    --font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
-    --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    /* --font-inter / --font-jetbrains-mono come from <Font> (astro.config.mjs fonts) */
+    --font-mono: var(--font-jetbrains-mono);
+    --font-sans: var(--font-inter);
 
     --max-width: 1200px;
     --nav-height: 64px;
