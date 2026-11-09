@@ -727,16 +727,12 @@ fn handle_update_confirm_key(state: &mut AppState, key: KeyEvent) {
     }
 }
 
-/// Find an account that matches the network of a post
+/// The account to act with on a post: its network's default account
 fn find_account_for_post(
     state: &AppState,
     post: &crate::models::Post,
 ) -> Option<crate::models::Account> {
-    state
-        .accounts
-        .iter()
-        .find(|a| a.network == post.network)
-        .cloned()
+    crate::models::Account::default_for_network(&state.accounts, post.network)
 }
 
 #[cfg(test)]
