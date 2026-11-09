@@ -19,5 +19,9 @@
   },
   "overrides": {
     "rollup": ">=4.59.0"
+  },
+  "allowScripts": {
+    "esbuild": false,
+    "fsevents": false
   }
 }
