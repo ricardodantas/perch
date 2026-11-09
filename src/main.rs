@@ -583,6 +583,7 @@ async fn post_cli(content: &str, networks: &[String], schedule: Option<&str>) ->
             .ok_or_else(|| anyhow::anyhow!("No credentials found for {}", account.handle))?;
 
         let client = perch::api::get_client(&account, &token).await?;
+        record_session_did(&db, &account, &client);
 
         println!("{} Posting to {}...", network.emoji(), network.name());
         let post = client.post(content).await?;
@@ -772,7 +773,10 @@ async fn process_scheduled_post(db: &perch::Database, post: &perch::ScheduledPos
             continue;
         };
 
-        match perch::api::get_client(&account, &token).await {
+        match perch::api::get_client(&account, &token)
+            .await
+            .inspect(|client| record_session_did(db, &account, client))
+        {
             Ok(client) => match client.post(&post.content).await {
                 Ok(posted) => {
                     if let Some(url) = &posted.url {
@@ -811,6 +815,14 @@ async fn process_scheduled_post(db: &perch::Database, post: &perch::ScheduledPos
     }
 
     Ok(())
+}
+
+/// Backfill a missing Bluesky DID from the session a client just created
+/// (no extra request)
+fn record_session_did(db: &perch::Database, account: &perch::Account, client: &perch::api::Client) {
+    if let Some(did) = client.session_did() {
+        db.backfill_account_did(account, did);
+    }
 }
 
 /// Truncate content for display
@@ -866,6 +878,7 @@ async fn timeline_cli(network: Option<&str>, limit: usize, tag: Option<&str>) ->
         };
 
         let client = perch::api::get_client(&account, &token).await?;
+        record_session_did(&db, &account, &client);
         sources.push(format!("{} @{}", network.emoji(), account.handle));
 
         if let Some(tag) = tag {

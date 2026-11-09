@@ -63,12 +63,22 @@ impl BlueskyClient {
             .await
             .context("Failed to parse login response")?;
 
-        Ok(Self {
+        Ok(Self::from_session(client, pds_url, session))
+    }
+
+    /// Build a client from a `createSession` response
+    fn from_session(client: Client, pds_url: String, session: CreateSessionResponse) -> Self {
+        Self {
             client,
             pds_url,
             access_jwt: session.access_jwt,
             did: session.did,
-        })
+        }
+    }
+
+    /// The account DID of the current session (from `createSession`)
+    pub fn did(&self) -> &str {
+        &self.did
     }
 
     /// Create a new client with existing credentials
@@ -1041,6 +1051,18 @@ impl FeedViewPost {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn did_comes_from_session_response() {
+        let session: CreateSessionResponse = serde_json::from_str(
+            r#"{"accessJwt":"jwt","refreshJwt":"refresh","handle":"me.bsky.social",
+                "did":"did:plc:abc123","active":true}"#,
+        )
+        .unwrap();
+        let client =
+            BlueskyClient::from_session(http_client(), DEFAULT_PDS_URL.to_string(), session);
+        assert_eq!(client.did(), "did:plc:abc123");
+    }
 
     #[test]
     fn create_post_record_omits_empty_reply() {
