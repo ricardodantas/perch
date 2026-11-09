@@ -399,6 +399,7 @@ async fn auth_flow(network: &str, instance: Option<&str>) -> Result<()> {
                 pds_url,
             );
             account.avatar_url = account_info.avatar_url;
+            account.did = account_info.did;
 
             // Re-auth of the same account updates it (same id => password replaced)
             let db = perch::Database::open()?;

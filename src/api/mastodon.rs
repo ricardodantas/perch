@@ -271,6 +271,7 @@ impl SocialApi for MastodonClient {
             avatar_url: Some(account.avatar),
             created_at: Utc::now(),
             last_used_at: None,
+            did: None,
         })
     }
 }
