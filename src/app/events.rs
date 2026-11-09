@@ -587,6 +587,19 @@ fn handle_search_key(state: &mut AppState, key: KeyEvent) -> Option<AsyncCommand
             state.search_query.clear();
         }
         KeyCode::Enter => {
+            if let Some(tag) = crate::api::parse_hashtag_query(&state.search_query)
+                && !state.accounts.is_empty()
+            {
+                // `#tag` loads the hashtag timeline from the networks
+                state.mode = Mode::Normal;
+                state.search_query.clear();
+                state.loading = true;
+                state.set_status(format!("Loading #{tag}..."));
+                return Some(AsyncCommand::HashtagTimeline {
+                    tag,
+                    accounts: state.accounts.clone(),
+                });
+            }
             if !state.search_query.is_empty() {
                 // Filter posts by search query (local search)
                 let query = state.search_query.to_lowercase();

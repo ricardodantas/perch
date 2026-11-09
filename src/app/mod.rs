@@ -193,6 +193,27 @@ fn handle_async_result(state: &mut AppState, result: AsyncResult) -> Option<Asyn
             }
             None
         }
+        AsyncResult::HashtagLoaded { tag, posts } => {
+            // Not cached: these posts are not part of the home timeline
+            state.posts = posts;
+            state.selected_post = 0;
+            state.loading = false;
+            state.set_status(format!(
+                "#{tag}: {} posts (press b to return to your timeline)",
+                state.posts.len()
+            ));
+
+            if let Some(post) = state.selected_post().cloned()
+                && let Some(account) = state.accounts.iter().find(|a| a.network == post.network)
+            {
+                return Some(AsyncCommand::FetchContext {
+                    post,
+                    account: account.clone(),
+                });
+            }
+            state.current_replies.clear();
+            None
+        }
         AsyncResult::ContextFetched {
             post_id: _,
             replies,

@@ -816,7 +816,7 @@ fn render_help_popup(frame: &mut Frame, state: &AppState) {
         ]),
         Line::from(vec![
             Span::styled("  /                ", colors.key_hint()),
-            Span::styled("Search posts", colors.text()),
+            Span::styled("Search posts (#tag for hashtag timeline)", colors.text()),
         ]),
         Line::from(""),
         Line::from(vec![Span::styled(
@@ -1373,7 +1373,7 @@ fn render_search_popup(frame: &mut Frame, state: &AppState) {
             Span::styled("  ", Style::default()),
             Span::styled(
                 if state.search_query.is_empty() {
-                    "Type to search..."
+                    "Type to search, or #tag for a hashtag timeline..."
                 } else {
                     &state.search_query
                 },

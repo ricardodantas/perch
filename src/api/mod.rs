@@ -13,6 +13,9 @@ pub trait SocialApi {
     /// Get the home timeline
     async fn timeline(&self, limit: usize) -> Result<Vec<Post>>;
 
+    /// Get recent public posts with a hashtag (`tag` without the leading `#`)
+    async fn hashtag_timeline(&self, tag: &str, limit: usize) -> Result<Vec<Post>>;
+
     /// Get replies/context for a post
     async fn get_context(&self, post: &Post) -> Result<Vec<Post>>;
 
@@ -52,6 +55,14 @@ impl Client {
         match self {
             Self::Mastodon(c) => c.timeline(limit).await,
             Self::Bluesky(c) => c.timeline(limit).await,
+        }
+    }
+
+    /// Get recent public posts with a hashtag (`tag` without the leading `#`)
+    pub async fn hashtag_timeline(&self, tag: &str, limit: usize) -> Result<Vec<Post>> {
+        match self {
+            Self::Mastodon(c) => c.hashtag_timeline(tag, limit).await,
+            Self::Bluesky(c) => c.hashtag_timeline(tag, limit).await,
         }
     }
 
@@ -120,6 +131,18 @@ impl Client {
     }
 }
 
+/// Parse a search query of the form `#tag` into a bare hashtag name.
+///
+/// Returns `None` unless the query starts with `#` and the rest is a single
+/// non-empty word.
+pub fn parse_hashtag_query(query: &str) -> Option<String> {
+    let tag = query.trim().strip_prefix('#')?;
+    if tag.is_empty() || tag.contains(char::is_whitespace) || tag.contains('#') {
+        return None;
+    }
+    Some(tag.to_string())
+}
+
 /// Get the appropriate API client for an account
 pub async fn get_client(account: &Account, token: &str) -> Result<Client> {
     match account.network {
@@ -138,5 +161,20 @@ pub async fn get_client(account: &Account, token: &str) -> Result<Client> {
                 bluesky::BlueskyClient::login_with_pds(&account.handle, token, pds_url).await?;
             Ok(Client::Bluesky(client))
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_hashtag_query;
+
+    #[test]
+    fn test_parse_hashtag_query() {
+        assert_eq!(parse_hashtag_query("#rust"), Some("rust".to_string()));
+        assert_eq!(parse_hashtag_query("  #Rust  "), Some("Rust".to_string()));
+        assert_eq!(parse_hashtag_query("rust"), None);
+        assert_eq!(parse_hashtag_query("#"), None);
+        assert_eq!(parse_hashtag_query("#two words"), None);
+        assert_eq!(parse_hashtag_query("##rust"), None);
     }
 }

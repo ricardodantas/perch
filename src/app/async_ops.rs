@@ -27,6 +27,8 @@ fn log_debug(msg: &str) {
 pub enum AsyncCommand {
     /// Refresh timeline for given accounts
     RefreshTimeline { accounts: Vec<Account> },
+    /// Load recent posts with a hashtag (without the leading `#`)
+    HashtagTimeline { tag: String, accounts: Vec<Account> },
     /// Fetch replies/context for a post
     FetchContext { post: Post, account: Account },
     /// Like a post
@@ -60,6 +62,8 @@ pub enum AsyncCommand {
 pub enum AsyncResult {
     /// Timeline refreshed with new posts
     TimelineRefreshed { posts: Vec<Post> },
+    /// Hashtag timeline loaded
+    HashtagLoaded { tag: String, posts: Vec<Post> },
     /// Context/replies fetched for a post
     #[allow(dead_code)]
     ContextFetched {
@@ -115,6 +119,9 @@ pub fn spawn_worker() -> AsyncHandle {
                 AsyncCommand::Shutdown => break,
                 AsyncCommand::RefreshTimeline { accounts } => {
                     handle_refresh(&result_tx, accounts).await;
+                }
+                AsyncCommand::HashtagTimeline { tag, accounts } => {
+                    handle_hashtag_timeline(&result_tx, tag, accounts).await;
                 }
                 AsyncCommand::FetchContext { post, account } => {
                     handle_fetch_context(&result_tx, post, account).await;
@@ -219,6 +226,55 @@ async fn handle_refresh(result_tx: &mpsc::Sender<AsyncResult>, accounts: Vec<Acc
                 .await;
         }
     }
+}
+
+async fn handle_hashtag_timeline(
+    result_tx: &mpsc::Sender<AsyncResult>,
+    tag: String,
+    accounts: Vec<Account>,
+) {
+    let mut posts = Vec::new();
+    let mut errors = Vec::new();
+    let mut seen_networks = Vec::new();
+
+    for account in &accounts {
+        // Hashtag timelines are public: one account per network is enough,
+        // and querying more would only duplicate results.
+        if seen_networks.contains(&account.network) {
+            continue;
+        }
+
+        let result = match auth::get_credentials(account) {
+            Ok(Some(token)) => match get_client(account, &token).await {
+                Ok(client) => client.hashtag_timeline(&tag, 40).await,
+                Err(e) => Err(e),
+            },
+            Ok(None) => {
+                errors.push(format!("No credentials for @{}", account.handle));
+                continue;
+            }
+            Err(e) => Err(e),
+        };
+
+        match result {
+            Ok(found) => {
+                seen_networks.push(account.network);
+                posts.extend(found);
+            }
+            Err(e) => errors.push(format!("@{}: {}", account.handle, e)),
+        }
+    }
+
+    posts.sort_by_key(|p| std::cmp::Reverse(p.created_at));
+
+    let result = if posts.is_empty() && !errors.is_empty() {
+        AsyncResult::Error {
+            message: errors.join("; "),
+        }
+    } else {
+        AsyncResult::HashtagLoaded { tag, posts }
+    };
+    let _ = result_tx.send(result).await;
 }
 
 async fn fetch_timeline(account: &Account, token: &str) -> Result<Vec<Post>> {
