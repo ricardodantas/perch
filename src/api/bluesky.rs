@@ -114,6 +114,37 @@ impl SocialApi for BlueskyClient {
             .collect())
     }
 
+    async fn hashtag_timeline(&self, tag: &str, limit: usize) -> Result<Vec<Post>> {
+        // `q` is required; `tag` restricts matches to the hashtag facet/tag field
+        let url = format!(
+            "{}/xrpc/app.bsky.feed.searchPosts?q={}&tag={}&sort=latest&limit={}",
+            self.pds_url,
+            urlencoding::encode(&format!("#{tag}")),
+            urlencoding::encode(tag),
+            limit.min(100)
+        );
+
+        let response = self
+            .client
+            .get(&url)
+            .header("Authorization", format!("Bearer {}", self.access_jwt))
+            .send()
+            .await
+            .context("Failed to search hashtag")?;
+
+        if !response.status().is_success() {
+            let error_text = response.text().await.unwrap_or_default();
+            bail!("Failed to fetch #{tag}: {error_text}");
+        }
+
+        let search: SearchPostsResponse = response
+            .json()
+            .await
+            .context("Failed to parse hashtag search response")?;
+
+        Ok(search.posts.into_iter().map(post_view_to_post).collect())
+    }
+
     async fn get_context(&self, post: &Post) -> Result<Vec<Post>> {
         let uri = post.uri.as_ref().context("Post missing URI for context")?;
 
@@ -657,6 +688,11 @@ struct GetTimelineResponse {
     feed: Vec<FeedViewPost>,
     #[allow(dead_code)]
     cursor: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct SearchPostsResponse {
+    posts: Vec<PostView>,
 }
 
 #[derive(Debug, Deserialize)]

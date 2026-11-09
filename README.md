@@ -349,6 +349,7 @@ perch accounts remove <account-id>
 |-----|--------|
 | `b` | Refresh timeline |
 | `f` | Cycle filter (All/Mastodon/Bluesky) |
+| `/` | Search posts (`#tag` opens a hashtag timeline) |
 | `Enter` | View post details |
 | `o` | Open in browser |
 | `L` | Like/favorite |

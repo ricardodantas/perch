@@ -65,6 +65,38 @@ impl SocialApi for MastodonClient {
             .collect())
     }
 
+    async fn hashtag_timeline(&self, tag: &str, limit: usize) -> Result<Vec<Post>> {
+        // Mastodon caps this endpoint at 40 statuses per page
+        let url = self.api_url(&format!(
+            "/timelines/tag/{}?limit={}",
+            urlencoding::encode(tag),
+            limit.min(40)
+        ));
+
+        let response = self
+            .client
+            .get(&url)
+            .header("Authorization", format!("Bearer {}", self.access_token))
+            .send()
+            .await
+            .context("Failed to fetch hashtag timeline")?;
+
+        if !response.status().is_success() {
+            let error_text = response.text().await.unwrap_or_default();
+            anyhow::bail!("Failed to fetch #{tag}: {error_text}");
+        }
+
+        let statuses: Vec<MastodonStatus> = response
+            .json()
+            .await
+            .context("Failed to parse hashtag timeline response")?;
+
+        Ok(statuses
+            .into_iter()
+            .map(MastodonStatus::into_post)
+            .collect())
+    }
+
     async fn get_context(&self, post: &Post) -> Result<Vec<Post>> {
         let url = self.api_url(&format!("/statuses/{}/context", post.network_id));
 

@@ -262,7 +262,7 @@ KEYBINDINGS (TUI):
 
     Actions
       n             New post (compose)
-      /             Search
+      /             Search (#tag opens a hashtag timeline)
       b             Refresh
       o             Open in browser
       L             Like/favorite

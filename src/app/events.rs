@@ -606,6 +606,19 @@ fn handle_search_key(state: &mut AppState, key: KeyEvent) -> Option<AsyncCommand
             state.search_query.clear();
         }
         KeyCode::Enter => {
+            if let Some(tag) = crate::api::parse_hashtag_query(&state.search_query)
+                && !state.accounts.is_empty()
+            {
+                // `#tag` loads the hashtag timeline from the networks
+                state.mode = Mode::Normal;
+                state.search_query.clear();
+                state.loading = true;
+                state.set_status(format!("Loading #{tag}..."));
+                return Some(AsyncCommand::HashtagTimeline {
+                    tag,
+                    accounts: state.accounts.clone(),
+                });
+            }
             if !state.search_query.is_empty() {
                 // Filter posts by search query (local search)
                 let query = state.search_query.to_lowercase();
@@ -751,5 +764,26 @@ mod tests {
         );
 
         assert_eq!((state.detail_scroll, state.mode), (10, Mode::Normal));
+    }
+    #[test]
+    fn pasted_hashtag_with_trailing_newline_loads_hashtag_timeline() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut state = test_state(&dir);
+        state.accounts.push(crate::models::Account::new_mastodon(
+            "me",
+            "https://example.social",
+            "Me",
+        ));
+        state.mode = Mode::Search;
+
+        handle_paste(&mut state, "#rust\r\n");
+        let cmd = handle_key(
+            &mut state,
+            KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE),
+        );
+
+        assert!(
+            matches!(cmd, Some(AsyncCommand::HashtagTimeline { ref tag, .. }) if tag == "rust")
+        );
     }
 }
