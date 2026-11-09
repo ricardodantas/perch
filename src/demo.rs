@@ -18,6 +18,7 @@ pub fn demo_accounts() -> Vec<Account> {
             avatar_url: None,
             created_at: Utc::now(),
             last_used_at: Some(Utc::now()),
+            did: None,
         },
         Account {
             id: Uuid::new_v4(),
@@ -29,6 +30,7 @@ pub fn demo_accounts() -> Vec<Account> {
             avatar_url: None,
             created_at: Utc::now(),
             last_used_at: Some(Utc::now()),
+            did: None,
         },
     ]
 }

@@ -55,7 +55,8 @@ impl Database {
                 is_default INTEGER NOT NULL DEFAULT 0,
                 avatar_url TEXT,
                 created_at TEXT NOT NULL,
-                last_used_at TEXT
+                last_used_at TEXT,
+                did TEXT
             );
 
             -- Drafts table
@@ -116,7 +117,40 @@ impl Database {
             ",
         )?;
 
+        self.migrate()
+    }
+
+    /// Additive, idempotent schema migrations for databases created by older
+    /// versions. Never drops or rewrites existing data.
+    fn migrate(&self) -> Result<()> {
+        // accounts.did (stable Bluesky account id), added after the first release
+        if !self.has_did_column()? {
+            self.add_did_column()?;
+        }
+
         Ok(())
+    }
+
+    fn has_did_column(&self) -> Result<bool> {
+        Ok(self.conn.query_row(
+            "SELECT COUNT(*) > 0 FROM pragma_table_info('accounts') WHERE name = 'did'",
+            [],
+            |row| row.get(0),
+        )?)
+    }
+
+    /// Add `accounts.did`. If the ALTER fails because another process (e.g. the
+    /// scheduler daemon and the TUI starting together) added the column after
+    /// our check, that's success, not an error.
+    fn add_did_column(&self) -> Result<()> {
+        match self
+            .conn
+            .execute("ALTER TABLE accounts ADD COLUMN did TEXT", [])
+        {
+            Ok(_) => Ok(()),
+            Err(_) if self.has_did_column()? => Ok(()),
+            Err(e) => Err(e).context("Failed to add accounts.did column"),
+        }
     }
 
     // ==================== Accounts ====================
@@ -124,8 +158,8 @@ impl Database {
     /// Insert a new account
     pub fn insert_account(&self, account: &Account) -> Result<()> {
         self.conn.execute(
-            r"INSERT INTO accounts (id, network, display_name, handle, server, is_default, avatar_url, created_at, last_used_at)
-               VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+            r"INSERT INTO accounts (id, network, display_name, handle, server, is_default, avatar_url, created_at, last_used_at, did)
+               VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
             params![
                 account.id.to_string(),
                 format!("{:?}", account.network).to_lowercase(),
@@ -136,30 +170,53 @@ impl Database {
                 account.avatar_url,
                 account.created_at.to_rfc3339(),
                 account.last_used_at.map(|dt| dt.to_rfc3339()),
+                account.did,
             ],
         )?;
         Ok(())
     }
 
-    /// Insert an account, or update the existing one with the same network,
-    /// handle and server (case-insensitive, ignoring a trailing `/`).
+    /// Insert an account, or update the existing row for the same account.
+    ///
+    /// A row matches if it has the same DID (Bluesky; survives handle and PDS
+    /// changes), otherwise the same network, handle and server
+    /// (case-insensitive, ignoring a trailing `/`). When `account` has a DID,
+    /// the handle fallback only matches legacy rows with no DID stored, so a
+    /// handle now owned by a different account never matches.
     ///
     /// On update the existing row keeps its id, `is_default` and `created_at`
-    /// (so credentials stored under its keyring key are replaced, not orphaned)
-    /// and only the profile fields are refreshed. Returns the stored account.
+    /// (so credentials stored under its keyring key are replaced, not orphaned);
+    /// profile fields, handle and server are refreshed and the DID is recorded.
+    /// Returns the stored account.
     pub fn upsert_account(&self, account: &Account) -> Result<Account> {
         let network_str = format!("{:?}", account.network).to_lowercase();
-        let existing: Option<String> = self
-            .conn
-            .query_row(
-                "SELECT id FROM accounts
-                 WHERE network = ?1 AND lower(handle) = lower(?2)
-                   AND rtrim(lower(server), '/') = rtrim(lower(?3), '/')
-                 ORDER BY is_default DESC, created_at DESC LIMIT 1",
-                params![network_str, account.handle, account.server],
-                |row| row.get(0),
-            )
-            .optional()?;
+        let by_did: Option<String> = match &account.did {
+            Some(did) => self
+                .conn
+                .query_row(
+                    "SELECT id FROM accounts WHERE network = ?1 AND did = ?2
+                     ORDER BY is_default DESC, created_at DESC LIMIT 1",
+                    params![network_str, did],
+                    |row| row.get(0),
+                )
+                .optional()?,
+            None => None,
+        };
+        let existing: Option<String> = match by_did {
+            Some(id) => Some(id),
+            None => self
+                .conn
+                .query_row(
+                    "SELECT id FROM accounts
+                     WHERE network = ?1 AND lower(handle) = lower(?2)
+                       AND rtrim(lower(server), '/') = rtrim(lower(?3), '/')
+                       AND (?4 IS NULL OR did IS NULL)
+                     ORDER BY is_default DESC, created_at DESC LIMIT 1",
+                    params![network_str, account.handle, account.server, account.did],
+                    |row| row.get(0),
+                )
+                .optional()?,
+        };
 
         let Some(id) = existing else {
             self.insert_account(account)?;
@@ -167,8 +224,17 @@ impl Database {
         };
 
         self.conn.execute(
-            "UPDATE accounts SET display_name = ?2, handle = ?3, avatar_url = ?4 WHERE id = ?1",
-            params![id, account.display_name, account.handle, account.avatar_url],
+            "UPDATE accounts SET display_name = ?2, handle = ?3, avatar_url = ?4,
+                    server = ?5, did = COALESCE(?6, did)
+             WHERE id = ?1",
+            params![
+                id,
+                account.display_name,
+                account.handle,
+                account.avatar_url,
+                account.server,
+                account.did
+            ],
         )?;
 
         self.get_accounts()?
@@ -180,7 +246,7 @@ impl Database {
     /// Get all accounts
     pub fn get_accounts(&self) -> Result<Vec<Account>> {
         let mut stmt = self.conn.prepare(
-            "SELECT id, network, display_name, handle, server, is_default, avatar_url, created_at, last_used_at 
+            "SELECT id, network, display_name, handle, server, is_default, avatar_url, created_at, last_used_at, did
              FROM accounts ORDER BY network, display_name"
         )?;
 
@@ -203,6 +269,7 @@ impl Database {
                     .get::<_, Option<String>>(8)?
                     .and_then(|s| DateTime::parse_from_rfc3339(&s).ok())
                     .map(|dt| dt.with_timezone(&Utc)),
+                did: row.get(9)?,
             })
         })?;
 
@@ -213,7 +280,7 @@ impl Database {
     pub fn get_accounts_for_network(&self, network: Network) -> Result<Vec<Account>> {
         let network_str = format!("{network:?}").to_lowercase();
         let mut stmt = self.conn.prepare(
-            "SELECT id, network, display_name, handle, server, is_default, avatar_url, created_at, last_used_at 
+            "SELECT id, network, display_name, handle, server, is_default, avatar_url, created_at, last_used_at, did
              FROM accounts WHERE network = ?1 ORDER BY display_name"
         )?;
 
@@ -236,6 +303,7 @@ impl Database {
                     .get::<_, Option<String>>(8)?
                     .and_then(|s| DateTime::parse_from_rfc3339(&s).ok())
                     .map(|dt| dt.with_timezone(&Utc)),
+                did: row.get(9)?,
             })
         })?;
 
@@ -250,7 +318,7 @@ impl Database {
     pub fn get_default_account(&self, network: Network) -> Result<Option<Account>> {
         let network_str = format!("{network:?}").to_lowercase();
         let mut stmt = self.conn.prepare(
-            "SELECT id, network, display_name, handle, server, is_default, avatar_url, created_at, last_used_at 
+            "SELECT id, network, display_name, handle, server, is_default, avatar_url, created_at, last_used_at, did
              FROM accounts WHERE network = ?1
              ORDER BY is_default DESC, created_at DESC LIMIT 1"
         )?;
@@ -274,6 +342,7 @@ impl Database {
                     .get::<_, Option<String>>(8)?
                     .and_then(|s| DateTime::parse_from_rfc3339(&s).ok())
                     .map(|dt| dt.with_timezone(&Utc)),
+                did: row.get(9)?,
             })
         });
 
@@ -644,6 +713,100 @@ mod tests {
         let masto = Account::new_mastodon("me.bsky.social", "https://bsky.social", "Me");
         assert_eq!(db.upsert_account(&masto).unwrap().id, masto.id);
         assert_eq!(db.get_accounts().unwrap().len(), 3);
+    }
+
+    /// Databases created before `accounts.did` existed get the column added
+    /// in place, keeping their rows; opening again is a no-op.
+    #[test]
+    fn test_migration_adds_did_column_to_existing_db() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("old.sqlite");
+        {
+            let conn = Connection::open(&path).unwrap();
+            conn.execute_batch(
+                "CREATE TABLE accounts (
+                    id TEXT PRIMARY KEY, network TEXT NOT NULL,
+                    display_name TEXT NOT NULL, handle TEXT NOT NULL,
+                    server TEXT NOT NULL, is_default INTEGER NOT NULL DEFAULT 0,
+                    avatar_url TEXT, created_at TEXT NOT NULL, last_used_at TEXT
+                );
+                INSERT INTO accounts VALUES ('11111111-1111-4111-8111-111111111111',
+                    'bluesky', 'Me', 'me.bsky.social', 'https://bsky.social', 1,
+                    NULL, '2026-01-01T00:00:00+00:00', NULL);",
+            )
+            .unwrap();
+        }
+
+        let db = Database::open_path(&path).unwrap();
+        let accounts = db.get_accounts().unwrap();
+        assert_eq!(accounts.len(), 1);
+        assert_eq!(accounts[0].handle, "me.bsky.social");
+        assert!(accounts[0].is_default);
+        assert_eq!(accounts[0].did, None);
+        drop(db);
+
+        // Idempotent
+        let db = Database::open_path(&path).unwrap();
+        assert_eq!(db.get_accounts().unwrap().len(), 1);
+    }
+
+    /// Two processes opening an old database at once both see `did` missing;
+    /// the one whose ALTER loses the race must still open successfully.
+    #[test]
+    fn test_add_did_column_tolerates_column_added_concurrently() {
+        let dir = tempdir().unwrap();
+        // Already migrated (as if another process just added the column)
+        let db = Database::open_path(&dir.path().join("test.sqlite")).unwrap();
+
+        db.add_did_column().unwrap();
+
+        assert!(db.has_did_column().unwrap());
+    }
+
+    /// Re-auth after a Bluesky handle change updates the same row via its DID.
+    #[test]
+    fn test_upsert_account_matches_bluesky_did_after_handle_change() {
+        let dir = tempdir().unwrap();
+        let db = Database::open_path(&dir.path().join("test.sqlite")).unwrap();
+
+        let mut first = Account::new_bluesky("old.bsky.social", "Me");
+        first.did = Some("did:plc:abc".to_string());
+        db.upsert_account(&first).unwrap();
+        db.set_default_account(first.id, Network::Bluesky).unwrap();
+
+        let mut renamed = Account::new_bluesky("new.example.com", "Me");
+        renamed.did = Some("did:plc:abc".to_string());
+        let stored = db.upsert_account(&renamed).unwrap();
+
+        assert_eq!(stored.id, first.id);
+        assert_eq!(stored.keyring_key(), first.keyring_key());
+        assert_eq!(stored.handle, "new.example.com");
+        assert!(stored.is_default);
+        assert_eq!(stored.created_at.timestamp(), first.created_at.timestamp());
+        assert_eq!(db.get_accounts().unwrap().len(), 1);
+    }
+
+    /// A legacy row with no DID still matches by handle + PDS, and records
+    /// the DID; a handle now owned by another DID does not match it.
+    #[test]
+    fn test_upsert_account_legacy_row_matches_by_handle() {
+        let dir = tempdir().unwrap();
+        let db = Database::open_path(&dir.path().join("test.sqlite")).unwrap();
+
+        let legacy = Account::new_bluesky("me.bsky.social", "Me");
+        db.insert_account(&legacy).unwrap();
+
+        let mut again = Account::new_bluesky("me.bsky.social", "Me");
+        again.did = Some("did:plc:abc".to_string());
+        let stored = db.upsert_account(&again).unwrap();
+        assert_eq!(stored.id, legacy.id);
+        assert_eq!(stored.did.as_deref(), Some("did:plc:abc"));
+
+        // Someone else later takes the handle: different DID, new row
+        let mut other = Account::new_bluesky("me.bsky.social", "Other");
+        other.did = Some("did:plc:xyz".to_string());
+        assert_eq!(db.upsert_account(&other).unwrap().id, other.id);
+        assert_eq!(db.get_accounts().unwrap().len(), 2);
     }
 
     /// Regression for #37: setting a default on one network must not clear

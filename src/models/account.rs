@@ -27,6 +27,11 @@ pub struct Account {
     pub created_at: DateTime<Utc>,
     /// Last used timestamp
     pub last_used_at: Option<DateTime<Utc>>,
+    /// Stable account identifier: the DID for Bluesky (survives handle
+    /// changes). `None` for Mastodon and for Bluesky accounts stored before
+    /// it was recorded.
+    #[serde(default)]
+    pub did: Option<String>,
 }
 
 impl Account {
@@ -42,6 +47,7 @@ impl Account {
             avatar_url: None,
             created_at: Utc::now(),
             last_used_at: None,
+            did: None,
         }
     }
 
@@ -62,6 +68,7 @@ impl Account {
             avatar_url: None,
             created_at: Utc::now(),
             last_used_at: None,
+            did: None,
         }
     }
 

@@ -662,6 +662,7 @@ impl SocialApi for BlueskyClient {
             avatar_url: profile.avatar,
             created_at: Utc::now(),
             last_used_at: None,
+            did: Some(self.did.clone()),
         })
     }
 }
