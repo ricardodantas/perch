@@ -27,7 +27,6 @@ pub fn process_pending_update(state: &mut AppState) {
     state.mode = Mode::Normal;
 }
 
-/// Handle key events, returning an optional async command
 /// Handle text pasted into the terminal (bracketed paste).
 ///
 /// Without bracketed paste, terminals and multiplexers replay pasted text as
@@ -48,6 +47,7 @@ pub fn handle_paste(state: &mut AppState, text: &str) {
     }
 }
 
+/// Handle key events, returning an optional async command
 pub fn handle_key(state: &mut AppState, key: KeyEvent) -> Option<AsyncCommand> {
     // Handle mode-specific input first
     match state.mode {
