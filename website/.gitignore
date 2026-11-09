@@ -15,3 +15,6 @@ dist/
 # OS
 .DS_Store
 Thumbs.db
+
+# Generated from ../screenshots by scripts/sync-screenshots.mjs
+public/screenshots/

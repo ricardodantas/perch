@@ -18,12 +18,16 @@ npm run build
 npm run preview
 ```
 
+Screenshots live in the repository's root `screenshots/` directory, which the VHS
+tapes write to. `npm run dev` and `npm run build` copy them into
+`public/screenshots/` first (`npm run sync-screenshots`); don't commit that copy.
+
 ## 📁 Structure
 
 ```
 website/
 ├── public/
-│   ├── screenshots/    # TUI screenshots
+│   ├── screenshots/    # Generated from ../screenshots (git-ignored)
 │   ├── favicon.svg
 │   ├── CNAME
 │   └── robots.txt
