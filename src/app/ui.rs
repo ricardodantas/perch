@@ -481,15 +481,15 @@ fn render_timeline_view(frame: &mut Frame, state: &mut AppState, area: Rect) {
             )]));
         }
 
-        // Check if we have images ready to render (in cache with protocol)
+        // Check if we have images ready to render (downloaded, with a picker available).
+        // The render protocol is created lazily by `get_image_protocol` below.
         let image_to_render: Option<String> = if state.show_images {
             post.media
                 .iter()
                 .filter(|m| m.media_type == crate::models::MediaType::Image)
                 .find_map(|m| {
                     let url = m.preview_url.as_ref().unwrap_or(&m.url);
-                    // Only include if we can actually render it
-                    if state.image_cache.contains(url) && state.image_protocols.contains_key(url) {
+                    if state.image_cache.contains(url) && crate::images::picker().is_some() {
                         Some(url.clone())
                     } else {
                         None

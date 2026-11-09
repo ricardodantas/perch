@@ -44,6 +44,8 @@ pub fn run() -> Result<()> {
     enable_raw_mode()?;
     let mut stdout = stdout();
     execute!(stdout, EnterAlternateScreen)?;
+    // Must run after entering the alternate screen and before reading terminal events.
+    crate::images::init_picker();
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
     terminal.clear()?;
