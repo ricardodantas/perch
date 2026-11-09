@@ -523,13 +523,11 @@ fn handle_compose_key(state: &mut AppState, key: KeyEvent) -> Option<AsyncComman
                     let content = state.compose_text.clone();
                     let reply_to = state.reply_to.clone();
                     let schedule = state.compose_schedule;
-                    // Find accounts matching selected networks
-                    let accounts: Vec<_> = state
-                        .accounts
-                        .iter()
-                        .filter(|a| state.compose_networks.contains(&a.network))
-                        .cloned()
-                        .collect();
+                    // One account per selected network (default, else newest)
+                    let accounts = crate::models::Account::default_for_networks(
+                        &state.accounts,
+                        &state.compose_networks,
+                    );
 
                     if accounts.is_empty() {
                         state.set_status("⚠ No accounts for selected networks");
