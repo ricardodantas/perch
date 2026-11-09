@@ -25,5 +25,10 @@
   "allowScripts": {
     "esbuild": false,
     "fsevents": false
+  },
+  "devDependencies": {
+    "@fontsource/inter": "^5.3.0",
+    "@fontsource/jetbrains-mono": "^5.3.0",
+    "fontkit": "^2.0.4"
   }
 }
