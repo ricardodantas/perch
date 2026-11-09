@@ -306,6 +306,10 @@ perch timeline bluesky
 
 # Limit posts
 perch timeline --limit 50
+
+# Recent public posts with a hashtag (all networks, newest first)
+perch timeline --tag rust
+perch timeline bluesky --tag rust --limit 10
 ```
 
 #### Account Management

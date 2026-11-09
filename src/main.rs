@@ -32,8 +32,18 @@ fn main() -> Result<()> {
         Command::Schedule { subcommand } => {
             tokio::runtime::Runtime::new()?.block_on(schedule_cli(subcommand))
         }
-        Command::Timeline { network, limit } => {
-            tokio::runtime::Runtime::new()?.block_on(timeline_cli(network.as_deref(), limit))
+        Command::Timeline {
+            network,
+            limit,
+            tag,
+        } => tokio::runtime::Runtime::new()?.block_on(timeline_cli(
+            network.as_deref(),
+            limit,
+            tag.as_deref(),
+        )),
+        Command::TimelineHelp => {
+            print_timeline_help();
+            Ok(())
         }
         Command::Accounts => list_accounts(),
         Command::Help => {
@@ -66,7 +76,9 @@ enum Command {
     Timeline {
         network: Option<String>,
         limit: usize,
+        tag: Option<String>,
     },
+    TimelineHelp,
     Accounts,
     Help,
     Version,
@@ -173,14 +185,15 @@ fn parse_args() -> Result<Command> {
         }
 
         "timeline" | "tl" => {
-            let network = args.get(2).cloned();
-            let limit = args
-                .iter()
-                .position(|a| a == "--limit" || a == "-l")
-                .and_then(|i| args.get(i + 1))
-                .and_then(|s| s.parse().ok())
-                .unwrap_or(20);
-            Ok(Command::Timeline { network, limit })
+            let parsed = parse_timeline_args(&args[2..])?;
+            if parsed.help {
+                return Ok(Command::TimelineHelp);
+            }
+            Ok(Command::Timeline {
+                network: parsed.network,
+                limit: parsed.limit,
+                tag: parsed.tag,
+            })
         }
 
         "accounts" => Ok(Command::Accounts),
@@ -189,6 +202,96 @@ fn parse_args() -> Result<Command> {
             "Unknown command: {other}\nRun 'perch --help' for usage"
         )),
     }
+}
+
+/// Parsed `perch timeline` arguments
+#[derive(Debug, PartialEq, Eq)]
+struct TimelineArgs {
+    network: Option<String>,
+    limit: usize,
+    tag: Option<String>,
+    help: bool,
+}
+
+/// Parse the arguments after `perch timeline`
+fn parse_timeline_args(args: &[String]) -> Result<TimelineArgs> {
+    let mut parsed = TimelineArgs {
+        network: None,
+        limit: 20,
+        tag: None,
+        help: false,
+    };
+
+    let mut iter = args.iter();
+    while let Some(arg) = iter.next() {
+        match arg.as_str() {
+            "-h" | "--help" => parsed.help = true,
+            "-l" | "--limit" => {
+                let value = iter
+                    .next()
+                    .ok_or_else(|| anyhow::anyhow!("--limit requires a number"))?;
+                parsed.limit = value
+                    .parse()
+                    .ok()
+                    .filter(|n| *n > 0)
+                    .ok_or_else(|| anyhow::anyhow!("Invalid --limit: {}", value))?;
+            }
+            "--tag" => {
+                let value = iter
+                    .next()
+                    .ok_or_else(|| anyhow::anyhow!("--tag requires a hashtag, e.g. --tag rust"))?;
+                parsed.tag = Some(normalize_tag_arg(value)?);
+            }
+            flag if flag.starts_with('-') => {
+                return Err(anyhow::anyhow!(
+                    "Unknown timeline option: {}\nRun 'perch timeline --help' for usage",
+                    flag
+                ));
+            }
+            name if parsed.network.is_none() => parsed.network = Some(name.to_string()),
+            extra => return Err(anyhow::anyhow!("Unexpected argument: {}", extra)),
+        }
+    }
+
+    Ok(parsed)
+}
+
+/// Accept `rust` or `#rust` and return the bare tag name
+fn normalize_tag_arg(value: &str) -> Result<String> {
+    let value = value.trim();
+    let query = if value.starts_with('#') {
+        value.to_string()
+    } else {
+        format!("#{}", value)
+    };
+    perch::api::parse_hashtag_query(&query)
+        .ok_or_else(|| anyhow::anyhow!("Invalid hashtag: '{}'", value))
+}
+
+fn print_timeline_help() {
+    println!(
+        r##"Show your home timeline, or recent public posts with a hashtag
+
+USAGE:
+    perch timeline [network] [OPTIONS]
+
+ARGS:
+    [network]                          mastodon or bluesky (default: all configured)
+
+OPTIONS:
+    -l, --limit <n>                    Number of posts (default: 20)
+                                       Per network for the home timeline,
+                                       in total with --tag
+        --tag <tag>                    Show recent public posts with this hashtag
+                                       ("rust" or "#rust"; quote it if it starts with #)
+    -h, --help                         Show this help
+
+EXAMPLES:
+    perch timeline
+    perch timeline mastodon --limit 50
+    perch timeline --tag rust
+    perch timeline bluesky --tag '#rust' --limit 10"##
+    );
 }
 
 fn print_help() {
@@ -234,12 +337,15 @@ COMMANDS:
         perch schedule daemon
         perch schedule daemon --interval 30
 
-    timeline [network] [OPTIONS]       Show timeline
+    timeline [network] [OPTIONS]       Show home timeline or a hashtag
       Options:
         -l, --limit <n>                Number of posts (default: 20)
+        --tag <tag>                    Recent public posts with #tag
       Examples:
         perch timeline
         perch timeline mastodon --limit 50
+        perch timeline --tag rust
+        perch timeline bluesky --tag rust --limit 10
 
     accounts                           List configured accounts
 
@@ -716,8 +822,11 @@ fn truncate_content(content: &str, max_len: usize) -> String {
     }
 }
 
-async fn timeline_cli(network: Option<&str>, limit: usize) -> Result<()> {
+async fn timeline_cli(network: Option<&str>, limit: usize, tag: Option<&str>) -> Result<()> {
     let db = perch::Database::open()?;
+    let explicit = network.is_some();
+    let mut tagged_posts = Vec::new();
+    let mut sources = Vec::new();
 
     let networks: Vec<perch::Network> = if let Some(name) = network {
         vec![
@@ -729,15 +838,39 @@ async fn timeline_cli(network: Option<&str>, limit: usize) -> Result<()> {
     };
 
     for network in networks {
+        let auth_cmd = match network {
+            perch::Network::Mastodon => "perch auth mastodon <instance>",
+            perch::Network::Bluesky => "perch auth bluesky",
+        };
         let Some(account) = db.get_default_account(network)? else {
+            if explicit {
+                return Err(anyhow::anyhow!(
+                    "No {} account configured. Run: {}",
+                    network.name(),
+                    auth_cmd
+                ));
+            }
             continue;
         };
 
         let Some(token) = perch::auth::get_credentials(&account)? else {
+            if explicit {
+                return Err(anyhow::anyhow!(
+                    "No credentials found for {}. Run: {}",
+                    account.handle,
+                    auth_cmd
+                ));
+            }
             continue;
         };
 
         let client = perch::api::get_client(&account, &token).await?;
+        sources.push(format!("{} @{}", network.emoji(), account.handle));
+
+        if let Some(tag) = tag {
+            tagged_posts.extend(client.hashtag_timeline(tag, limit).await?);
+            continue;
+        }
 
         println!(
             "\n{} {} Timeline (@{})",
@@ -749,17 +882,42 @@ async fn timeline_cli(network: Option<&str>, limit: usize) -> Result<()> {
 
         let posts = client.timeline(limit).await?;
 
-        for post in posts {
-            println!("\n@{} · {}", post.author_handle, post.relative_time());
-            println!("{}", post.content);
-            println!(
-                "♥ {}  🔁 {}  💬 {}",
-                post.like_count, post.repost_count, post.reply_count
-            );
+        for post in &posts {
+            print_post(post);
+        }
+    }
+
+    if sources.is_empty() {
+        return Err(anyhow::anyhow!(
+            "No accounts configured. Run: perch auth mastodon <instance> or perch auth bluesky"
+        ));
+    }
+
+    if let Some(tag) = tag {
+        tagged_posts.sort_by_key(|p| std::cmp::Reverse(p.created_at));
+        tagged_posts.truncate(limit);
+
+        println!("\n#{} ({})", tag, sources.join(", "));
+        println!("{}", "─".repeat(60));
+        if tagged_posts.is_empty() {
+            println!("\nNo recent posts with #{}", tag);
+        }
+        for post in &tagged_posts {
+            print_post(post);
         }
     }
 
     Ok(())
+}
+
+/// Print one post in the `perch timeline` format
+fn print_post(post: &perch::Post) {
+    println!("\n@{} · {}", post.author_handle, post.relative_time());
+    println!("{}", post.content);
+    println!(
+        "♥ {}  🔁 {}  💬 {}",
+        post.like_count, post.repost_count, post.reply_count
+    );
 }
 
 fn list_accounts() -> Result<()> {
@@ -798,4 +956,44 @@ fn list_accounts() -> Result<()> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{TimelineArgs, parse_timeline_args};
+
+    fn parse(args: &[&str]) -> anyhow::Result<TimelineArgs> {
+        let args: Vec<String> = args.iter().map(ToString::to_string).collect();
+        parse_timeline_args(&args)
+    }
+
+    #[test]
+    fn test_parse_timeline_args() {
+        let parsed = parse(&[]).unwrap();
+        assert_eq!(parsed.network, None);
+        assert_eq!(parsed.limit, 20);
+        assert_eq!(parsed.tag, None);
+
+        // Flags before the network used to be taken as the network name
+        let parsed = parse(&["--limit", "50"]).unwrap();
+        assert_eq!((parsed.network, parsed.limit), (None, 50));
+
+        let parsed = parse(&["bluesky", "--tag", "#Rust", "-l", "5"]).unwrap();
+        assert_eq!(parsed.network.as_deref(), Some("bluesky"));
+        assert_eq!(parsed.tag.as_deref(), Some("Rust"));
+        assert_eq!(parsed.limit, 5);
+
+        assert_eq!(
+            parse(&["--tag", "rust"]).unwrap().tag.as_deref(),
+            Some("rust")
+        );
+        assert!(parse(&["--help"]).unwrap().help);
+
+        assert!(parse(&["--tag"]).is_err());
+        assert!(parse(&["--tag", "#"]).is_err());
+        assert!(parse(&["--tag", "two words"]).is_err());
+        assert!(parse(&["--limit", "0"]).is_err());
+        assert!(parse(&["--bogus"]).is_err());
+        assert!(parse(&["mastodon", "bluesky"]).is_err());
+    }
 }
