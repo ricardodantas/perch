@@ -765,4 +765,25 @@ mod tests {
 
         assert_eq!((state.detail_scroll, state.mode), (10, Mode::Normal));
     }
+    #[test]
+    fn pasted_hashtag_with_trailing_newline_loads_hashtag_timeline() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut state = test_state(&dir);
+        state.accounts.push(crate::models::Account::new_mastodon(
+            "me",
+            "https://example.social",
+            "Me",
+        ));
+        state.mode = Mode::Search;
+
+        handle_paste(&mut state, "#rust\r\n");
+        let cmd = handle_key(
+            &mut state,
+            KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE),
+        );
+
+        assert!(
+            matches!(cmd, Some(AsyncCommand::HashtagTimeline { ref tag, .. }) if tag == "rust")
+        );
+    }
 }
