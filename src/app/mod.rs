@@ -11,7 +11,7 @@ pub use state::ReplyItem;
 
 use anyhow::Result;
 use crossterm::{
-    event::{self, Event},
+    event::{self, DisableBracketedPaste, EnableBracketedPaste, Event},
     execute,
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
@@ -43,7 +43,7 @@ pub fn run() -> Result<()> {
     // Initialize terminal
     enable_raw_mode()?;
     let mut stdout = stdout();
-    execute!(stdout, EnterAlternateScreen)?;
+    execute!(stdout, EnterAlternateScreen, EnableBracketedPaste)?;
     // Must run after entering the alternate screen and before reading terminal events.
     crate::images::init_picker();
     let backend = CrosstermBackend::new(stdout);
@@ -81,7 +81,11 @@ pub fn run() -> Result<()> {
 
     // Restore terminal
     disable_raw_mode()?;
-    execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
+    execute!(
+        terminal.backend_mut(),
+        DisableBracketedPaste,
+        LeaveAlternateScreen
+    )?;
     terminal.show_cursor()?;
 
     result
@@ -138,11 +142,18 @@ fn run_app(
         }
 
         // Handle events
-        if event::poll(Duration::from_millis(50))?
-            && let Event::Key(key) = event::read()?
-            && let Some(cmd) = events::handle_key(state, key)
-        {
-            let _ = async_handle.cmd_tx.blocking_send(cmd);
+        if event::poll(Duration::from_millis(50))? {
+            let cmd = match event::read()? {
+                Event::Key(key) => events::handle_key(state, key),
+                Event::Paste(text) => {
+                    events::handle_paste(state, &text);
+                    None
+                }
+                _ => None,
+            };
+            if let Some(cmd) = cmd {
+                let _ = async_handle.cmd_tx.blocking_send(cmd);
+            }
         }
 
         // Queue image loading for current post
@@ -282,7 +293,7 @@ pub fn run_demo() -> Result<()> {
     // Initialize terminal
     enable_raw_mode()?;
     let mut stdout = stdout();
-    execute!(stdout, EnterAlternateScreen)?;
+    execute!(stdout, EnterAlternateScreen, EnableBracketedPaste)?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
     terminal.clear()?;
@@ -305,11 +316,15 @@ pub fn run_demo() -> Result<()> {
         terminal.draw(|frame| ui::render(frame, &mut state))?;
 
         // Handle events
-        if event::poll(Duration::from_millis(50))?
-            && let Event::Key(key) = event::read()?
-        {
+        if event::poll(Duration::from_millis(50))? {
             // Simple event handling for demo
-            events::handle_key(&mut state, key);
+            match event::read()? {
+                Event::Key(key) => {
+                    events::handle_key(&mut state, key);
+                }
+                Event::Paste(text) => events::handle_paste(&mut state, &text),
+                _ => {}
+            }
         }
 
         // Tick for animations
@@ -322,7 +337,11 @@ pub fn run_demo() -> Result<()> {
 
     // Restore terminal
     disable_raw_mode()?;
-    execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
+    execute!(
+        terminal.backend_mut(),
+        DisableBracketedPaste,
+        LeaveAlternateScreen
+    )?;
     terminal.show_cursor()?;
 
     // Save config on exit
