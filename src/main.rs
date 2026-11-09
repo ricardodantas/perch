@@ -348,8 +348,9 @@ async fn auth_flow(network: &str, instance: Option<&str>) -> Result<()> {
             );
             account.avatar_url = account_info.avatar_url;
 
+            // Re-auth of the same account updates it (same id => token replaced)
             let db = perch::Database::open()?;
-            db.insert_account(&account)?;
+            let account = db.upsert_account(&account)?;
 
             // Store token
             perch::auth::store_credentials(&account, &token.access_token)?;
@@ -398,8 +399,9 @@ async fn auth_flow(network: &str, instance: Option<&str>) -> Result<()> {
             );
             account.avatar_url = account_info.avatar_url;
 
+            // Re-auth of the same account updates it (same id => password replaced)
             let db = perch::Database::open()?;
-            db.insert_account(&account)?;
+            let account = db.upsert_account(&account)?;
 
             // Store app password
             perch::auth::store_credentials(&account, password)?;
@@ -423,10 +425,12 @@ async fn post_cli(content: &str, networks: &[String], schedule: Option<&str>) ->
     let db = perch::Database::open()?;
 
     // Parse networks
-    let parsed_networks: Vec<perch::Network> = networks
-        .iter()
-        .filter_map(|n| perch::Network::from_str(n))
-        .collect();
+    let mut parsed_networks: Vec<perch::Network> = Vec::new();
+    for network in networks.iter().filter_map(|n| perch::Network::from_str(n)) {
+        if !parsed_networks.contains(&network) {
+            parsed_networks.push(network);
+        }
+    }
 
     if parsed_networks.is_empty() {
         return Err(anyhow::anyhow!("No valid networks specified"));
@@ -636,7 +640,14 @@ async fn process_scheduled_post(db: &perch::Database, post: &perch::ScheduledPos
     let mut success = true;
     let mut error_msg = String::new();
 
+    let mut done: Vec<perch::Network> = Vec::new();
     for network in &post.networks {
+        // Older TUI-scheduled posts may list a network twice (duplicate accounts)
+        if done.contains(network) {
+            continue;
+        }
+        done.push(*network);
+
         let Some(account) = db.get_default_account(*network)? else {
             let msg = format!("No {} account configured", network.name());
             println!("    ⚠️  {}", msg);

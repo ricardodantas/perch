@@ -2,7 +2,7 @@
 
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
-use rusqlite::{Connection, params};
+use rusqlite::{Connection, OptionalExtension, params};
 use std::path::PathBuf;
 use uuid::Uuid;
 
@@ -139,6 +139,42 @@ impl Database {
             ],
         )?;
         Ok(())
+    }
+
+    /// Insert an account, or update the existing one with the same network,
+    /// handle and server (case-insensitive, ignoring a trailing `/`).
+    ///
+    /// On update the existing row keeps its id, `is_default` and `created_at`
+    /// (so credentials stored under its keyring key are replaced, not orphaned)
+    /// and only the profile fields are refreshed. Returns the stored account.
+    pub fn upsert_account(&self, account: &Account) -> Result<Account> {
+        let network_str = format!("{:?}", account.network).to_lowercase();
+        let existing: Option<String> = self
+            .conn
+            .query_row(
+                "SELECT id FROM accounts
+                 WHERE network = ?1 AND lower(handle) = lower(?2)
+                   AND rtrim(lower(server), '/') = rtrim(lower(?3), '/')
+                 ORDER BY is_default DESC, created_at DESC LIMIT 1",
+                params![network_str, account.handle, account.server],
+                |row| row.get(0),
+            )
+            .optional()?;
+
+        let Some(id) = existing else {
+            self.insert_account(account)?;
+            return Ok(account.clone());
+        };
+
+        self.conn.execute(
+            "UPDATE accounts SET display_name = ?2, handle = ?3, avatar_url = ?4 WHERE id = ?1",
+            params![id, account.display_name, account.handle, account.avatar_url],
+        )?;
+
+        self.get_accounts()?
+            .into_iter()
+            .find(|a| a.id.to_string() == id)
+            .context("Updated account not found")
     }
 
     /// Get all accounts
@@ -572,6 +608,42 @@ mod tests {
         assert_eq!(found.map(|a| a.id), Some(new_bsky.id));
         let found = db.get_default_account(Network::Mastodon).unwrap();
         assert_eq!(found.map(|a| a.id), Some(mastodon.id));
+    }
+
+    /// Re-running `perch auth` for the same account must update it, not add a
+    /// duplicate row, and keep its id so stored credentials are replaced.
+    #[test]
+    fn test_upsert_account_updates_same_handle_and_server() {
+        let dir = tempdir().unwrap();
+        let db = Database::open_path(&dir.path().join("test.sqlite")).unwrap();
+
+        let first = Account::new_bluesky_with_pds("me.bsky.social", "Me", "https://bsky.social");
+        let stored = db.upsert_account(&first).unwrap();
+        assert_eq!(stored.id, first.id);
+        db.set_default_account(first.id, Network::Bluesky).unwrap();
+
+        // Re-auth: fresh Account value, different case and trailing slash
+        let mut again =
+            Account::new_bluesky_with_pds("Me.bsky.social", "New Name", "https://bsky.social/");
+        again.avatar_url = Some("https://example.com/a.png".to_string());
+        let stored = db.upsert_account(&again).unwrap();
+        assert_eq!(stored.id, first.id);
+        assert_eq!(stored.keyring_key(), first.keyring_key());
+        assert!(stored.is_default);
+        assert_eq!(stored.display_name, "New Name");
+        assert_eq!(
+            stored.avatar_url.as_deref(),
+            Some("https://example.com/a.png")
+        );
+        assert_eq!(db.get_accounts().unwrap().len(), 1);
+
+        // Same handle on a different server/network is a different account
+        let other_pds =
+            Account::new_bluesky_with_pds("me.bsky.social", "Me", "https://pds.example");
+        assert_eq!(db.upsert_account(&other_pds).unwrap().id, other_pds.id);
+        let masto = Account::new_mastodon("me.bsky.social", "https://bsky.social", "Me");
+        assert_eq!(db.upsert_account(&masto).unwrap().id, masto.id);
+        assert_eq!(db.get_accounts().unwrap().len(), 3);
     }
 
     /// Regression for #37: setting a default on one network must not clear
