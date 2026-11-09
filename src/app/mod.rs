@@ -223,12 +223,10 @@ fn handle_async_result(state: &mut AppState, result: AsyncResult) -> Option<Asyn
 
             // Fetch replies for the first post
             if let Some(post) = state.selected_post().cloned()
-                && let Some(account) = state.accounts.iter().find(|a| a.network == post.network)
+                && let Some(account) =
+                    crate::models::Account::default_for_network(&state.accounts, post.network)
             {
-                return Some(AsyncCommand::FetchContext {
-                    post,
-                    account: account.clone(),
-                });
+                return Some(AsyncCommand::FetchContext { post, account });
             }
             None
         }
@@ -243,12 +241,10 @@ fn handle_async_result(state: &mut AppState, result: AsyncResult) -> Option<Asyn
             ));
 
             if let Some(post) = state.selected_post().cloned()
-                && let Some(account) = state.accounts.iter().find(|a| a.network == post.network)
+                && let Some(account) =
+                    crate::models::Account::default_for_network(&state.accounts, post.network)
             {
-                return Some(AsyncCommand::FetchContext {
-                    post,
-                    account: account.clone(),
-                });
+                return Some(AsyncCommand::FetchContext { post, account });
             }
             state.current_replies.clear();
             None

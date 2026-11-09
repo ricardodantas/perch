@@ -163,6 +163,10 @@ pub fn spawn_worker() -> AsyncHandle {
 }
 
 async fn handle_refresh(result_tx: &mpsc::Sender<AsyncResult>, accounts: Vec<Account>) {
+    // Fetch once per network with its default account; duplicate account rows
+    // for the same network would otherwise show every post twice.
+    let accounts = Account::default_for_networks(&accounts, Network::all());
+
     let _ = result_tx
         .send(AsyncResult::Status {
             message: "Refreshing...".to_string(),
@@ -204,8 +208,7 @@ async fn handle_refresh(result_tx: &mpsc::Sender<AsyncResult>, accounts: Vec<Acc
         }
     }
 
-    // Sort by timestamp (newest first)
-    all_posts.sort_by_key(|p| std::cmp::Reverse(p.created_at));
+    let all_posts = merge_timeline_posts(all_posts);
 
     if all_posts.is_empty() && !errors.is_empty() {
         let _ = result_tx
@@ -233,17 +236,13 @@ async fn handle_hashtag_timeline(
     tag: String,
     accounts: Vec<Account>,
 ) {
+    // Hashtag timelines are public: one account (the network's default) per
+    // network is enough; querying more would only duplicate results.
+    let accounts = Account::default_for_networks(&accounts, Network::all());
     let mut posts = Vec::new();
     let mut errors = Vec::new();
-    let mut seen_networks = Vec::new();
 
     for account in &accounts {
-        // Hashtag timelines are public: one account per network is enough,
-        // and querying more would only duplicate results.
-        if seen_networks.contains(&account.network) {
-            continue;
-        }
-
         let result = match auth::get_credentials(account) {
             Ok(Some(token)) => match get_client(account, &token).await {
                 Ok(client) => client.hashtag_timeline(&tag, 40).await,
@@ -257,15 +256,12 @@ async fn handle_hashtag_timeline(
         };
 
         match result {
-            Ok(found) => {
-                seen_networks.push(account.network);
-                posts.extend(found);
-            }
+            Ok(found) => posts.extend(found),
             Err(e) => errors.push(format!("@{}: {}", account.handle, e)),
         }
     }
 
-    posts.sort_by_key(|p| std::cmp::Reverse(p.created_at));
+    let posts = merge_timeline_posts(posts);
 
     let result = if posts.is_empty() && !errors.is_empty() {
         AsyncResult::Error {
@@ -275,6 +271,15 @@ async fn handle_hashtag_timeline(
         AsyncResult::HashtagLoaded { tag, posts }
     };
     let _ = result_tx.send(result).await;
+}
+
+/// Sort posts newest first and drop repeated timeline entries (same network,
+/// post id and reposter). Reposts by different people are kept.
+fn merge_timeline_posts(mut posts: Vec<Post>) -> Vec<Post> {
+    posts.sort_by_key(|p| std::cmp::Reverse(p.created_at));
+    let mut seen = std::collections::HashSet::new();
+    posts.retain(|p| seen.insert((p.network, p.network_id.clone(), p.repost_author.clone())));
+    posts
 }
 
 async fn fetch_timeline(account: &Account, token: &str) -> Result<Vec<Post>> {
@@ -777,4 +782,30 @@ fn resize_if_needed(image: image::DynamicImage) -> image::DynamicImage {
     };
 
     image.resize(new_width, new_height, image::imageops::FilterType::Triangle)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::merge_timeline_posts;
+
+    #[test]
+    fn test_merge_timeline_posts_dedupes_and_sorts() {
+        let posts = crate::demo::demo_posts();
+        let mut boosted = posts[0].clone();
+        boosted.is_repost = true;
+        boosted.repost_author = Some("someone".to_string());
+
+        // Same posts fetched twice (e.g. two accounts on one network) + a boost
+        let mut input = posts.clone();
+        input.extend(posts.iter().cloned());
+        input.push(boosted);
+
+        let merged = merge_timeline_posts(input);
+        assert_eq!(merged.len(), posts.len() + 1);
+        assert!(
+            merged
+                .windows(2)
+                .all(|w| w[0].created_at >= w[1].created_at)
+        );
+    }
 }
