@@ -11,6 +11,7 @@ pub use state::ReplyItem;
 
 use anyhow::Result;
 use crossterm::{
+    cursor::Show,
     event::{self, DisableBracketedPaste, EnableBracketedPaste, Event},
     execute,
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
@@ -25,6 +26,30 @@ use crate::db::Database;
 use crate::demo;
 
 use async_ops::{AsyncCommand, AsyncHandle, AsyncResult, spawn_worker};
+
+/// Install a panic hook that restores the terminal before the panic is reported.
+///
+/// Without it, a panic prints its message onto the alternate screen and leaves
+/// the shell in raw mode with bracketed paste enabled. Restoration is
+/// best-effort (errors are ignored) and only happens for panics on the thread
+/// that runs the TUI: panics in background threads or tokio tasks don't end
+/// the app, so the terminal must stay as it is. The previously installed hook
+/// runs afterwards so the message and backtrace are still printed. Installed
+/// at most once.
+fn install_panic_hook() {
+    static INSTALL: std::sync::Once = std::sync::Once::new();
+    INSTALL.call_once(|| {
+        let tui_thread = std::thread::current().id();
+        let previous = std::panic::take_hook();
+        std::panic::set_hook(Box::new(move |info| {
+            if std::thread::current().id() == tui_thread {
+                let _ = disable_raw_mode();
+                let _ = execute!(stdout(), DisableBracketedPaste, LeaveAlternateScreen, Show);
+            }
+            previous(info);
+        }));
+    });
+}
 
 /// Run the TUI application
 pub fn run() -> Result<()> {
@@ -41,6 +66,7 @@ pub fn run() -> Result<()> {
     let async_handle = rt.block_on(async { spawn_worker() });
 
     // Initialize terminal
+    install_panic_hook();
     enable_raw_mode()?;
     let mut stdout = stdout();
     execute!(stdout, EnterAlternateScreen, EnableBracketedPaste)?;
@@ -312,6 +338,7 @@ pub fn run_demo() -> Result<()> {
     let db = Database::open()?;
 
     // Initialize terminal
+    install_panic_hook();
     enable_raw_mode()?;
     let mut stdout = stdout();
     execute!(stdout, EnterAlternateScreen, EnableBracketedPaste)?;
